@@ -1,10 +1,8 @@
 # outproxy-eagle systemd unit.
 #
-# Install:
-#   sudo install -Dm755 build/outproxy-eagle /usr/local/bin/outproxy-eagle
-#   sudo install -d /etc/outproxy-eagle /var/lib/outproxy-eagle
-#   sudo cp eagle.conf.example /etc/outproxy-eagle/eagle.conf   # then edit
-#   sudo cp -r web /var/lib/outproxy-eagle/                     # web templates
+# Installed automatically by the .deb package. For a manual install, place the
+# binary at /usr/bin/outproxy-eagle, the config at /etc/outproxy-eagle/eagle.conf
+# and the web assets at /usr/share/outproxy-eagle/web, then:
 #   sudo cp systemd/outproxy-eagle.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now outproxy-eagle
@@ -13,8 +11,8 @@
 #   systemctl status|stop|start|restart outproxy-eagle
 #   journalctl -u outproxy-eagle -f
 #
-# The working directory holds web/, eagle.log and stats.json. Set "webdir",
-# "logfile" and "statsfile" in the config as relative paths or absolute.
+# State (eagle.log, state.json) lives under /var/lib/outproxy-eagle, provided
+# by StateDirectory below.
 
 [Unit]
 Description=outproxy-eagle - native HTTP/SOCKS5 outproxy with web statistics
@@ -24,7 +22,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/outproxy-eagle -c /etc/outproxy-eagle/eagle.conf
+ExecStart=/usr/bin/outproxy-eagle -c /etc/outproxy-eagle/eagle.conf
 WorkingDirectory=/var/lib/outproxy-eagle
 Restart=on-failure
 RestartSec=2
@@ -51,7 +49,7 @@ MemoryDenyWriteExecute=yes
 RestrictAddressFamilies=AF_INET AF_INET6
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
-# Persisted data (stats.json / eagle.log) lives under /var/lib/outproxy-eagle.
+# Persisted data (state.json / eagle.log) lives under /var/lib/outproxy-eagle.
 ReadWritePaths=/var/lib/outproxy-eagle
 
 [Install]

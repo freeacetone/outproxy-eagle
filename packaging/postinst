@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    # Register the unit (no auto-start: let the admin review the config first).
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    echo "outproxy-eagle installed."
+    echo "  1) edit /etc/outproxy-eagle/eagle.conf"
+    echo "  2) systemctl enable --now outproxy-eagle"
+fi
+
+exit 0

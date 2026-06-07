@@ -58,6 +58,26 @@ cmake --build build -j
 
 The binary is `build/outproxy-eagle`.
 
+## Install (.deb)
+
+Prebuilt Debian packages for Debian 12 (bookworm) and 13 (trixie) are attached
+to each [release](https://github.com/freeacetone/outproxy-eagle/releases) — built
+automatically by the `build-deb` GitHub Action.
+
+```sh
+sudo apt install ./outproxy-eagle_2.0.0_trixie_amd64.deb
+sudoedit /etc/outproxy-eagle/eagle.conf
+sudo systemctl enable --now outproxy-eagle
+```
+
+The package installs the binary to `/usr/bin`, a config to
+`/etc/outproxy-eagle/eagle.conf` (a conffile), web assets to
+`/usr/share/outproxy-eagle/web`, and the systemd unit. To build a package
+yourself: `cmake -B build -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build &&
+(cd build && cpack -G DEB)`.
+
+The application version is taken from the git tag at build time.
+
 ## Run
 
 ```sh

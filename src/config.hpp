@@ -11,8 +11,12 @@ Copyright (C) 2022-2026, acetone. GPLv3.
 
 namespace eagle {
 
+#ifndef OUTPROXY_VERSION
+#define OUTPROXY_VERSION "0.0.0-dev" // overridden by the build (from the git tag)
+#endif
+
 inline constexpr const char* SOFTWARE_NAME    = "outproxy-eagle";
-inline constexpr const char* SOFTWARE_VERSION = "2.0";
+inline constexpr const char* SOFTWARE_VERSION = OUTPROXY_VERSION;
 
 struct Listener
 {

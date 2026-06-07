@@ -1,0 +1,75 @@
+name: build-deb
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.codename }} (debian ${{ matrix.release }})
+    runs-on: ubuntu-latest
+    container: debian:${{ matrix.release }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - release: "12"
+            codename: bookworm
+          - release: "13"
+            codename: trixie
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential cmake libasio-dev dpkg-dev file git ca-certificates
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building version ${VERSION}"
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DOUTPROXY_VERSION="${{ steps.ver.outputs.version }}"
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Package (.deb)
+        working-directory: build
+        run: |
+          cpack -G DEB
+          src=$(ls outproxy-eagle_*_amd64.deb | head -n1)
+          out="outproxy-eagle_${{ steps.ver.outputs.version }}_${{ matrix.codename }}_amd64.deb"
+          mv "$src" "../$out"
+          echo "Built $out"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: outproxy-eagle_${{ matrix.codename }}_amd64
+          path: outproxy-eagle_*_${{ matrix.codename }}_amd64.deb
+
+      - name: Attach to release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: outproxy-eagle_*_${{ matrix.codename }}_amd64.deb

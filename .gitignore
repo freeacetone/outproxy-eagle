@@ -1,8 +1,10 @@
 # build
 /build/
+/build-deb/
 *.o
 *.obj
 *.a
+*.deb
 
 # runtime data
 /eagle.conf
