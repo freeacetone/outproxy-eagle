@@ -79,7 +79,7 @@ The `web/` directory (configurable via `set webdir`) is served as-is:
 
 - `web/index.html` — the page template. Placeholders `{{TITLE}}`, `{{ACTIVE}}`,
   `{{DAILY_UP}}`, `{{DAILY_DOWN}}`, `{{TOTAL_UP}}`, `{{TOTAL_DOWN}}`,
-  `{{SINCE_LAST_VISIT}}`, `{{VERSION}}` and `{{INFORMATION}}` are substituted
+  `{{TRAFFIC_LINE}}`, `{{VERSION}}` and `{{INFORMATION}}` are substituted
   on render.
 - `web/style.css` — theme; edit or replace freely.
 - `web/information.html` — optional; its full HTML is injected as an

@@ -118,6 +118,7 @@ R"HTML(<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{TITLE}}</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -140,7 +141,7 @@ R"HTML(<!DOCTYPE html>
     </div>
   </section>
 
-  <p class="since">Traffic since your last visit: <strong>{{SINCE_LAST_VISIT}}</strong></p>
+  <p class="since">{{TRAFFIC_LINE}}</p>
 
   {{INFORMATION}}
 
@@ -177,15 +178,27 @@ std::string render_index(const Config& cfg, Stats& stats,
         information = "<section class=\"information\">" + information + "</section>";
     }
 
-    replace_all(tpl, "{{TITLE}}",            html_escape(cfg.title));
-    replace_all(tpl, "{{VERSION}}",          SOFTWARE_VERSION);
-    replace_all(tpl, "{{ACTIVE}}",           std::to_string(snap.active));
-    replace_all(tpl, "{{DAILY_UP}}",         human_bytes(snap.daily_up));
-    replace_all(tpl, "{{DAILY_DOWN}}",       human_bytes(snap.daily_down));
-    replace_all(tpl, "{{TOTAL_UP}}",         human_bytes(snap.total_up));
-    replace_all(tpl, "{{TOTAL_DOWN}}",       human_bytes(snap.total_down));
-    replace_all(tpl, "{{SINCE_LAST_VISIT}}", human_bytes(since));
-    replace_all(tpl, "{{INFORMATION}}",      information);
+    // Show the delta since the visitor's last visit; fall back to the all-time
+    // total when there is no new traffic to report (delta == 0).
+    std::string traffic_line;
+    if (since > 0)
+    {
+        traffic_line = "Traffic since your last visit: <strong>" + human_bytes(since) + "</strong>";
+    }
+    else
+    {
+        traffic_line = "Total traffic served: <strong>" + human_bytes(current) + "</strong>";
+    }
+
+    replace_all(tpl, "{{TITLE}}",         html_escape(cfg.title));
+    replace_all(tpl, "{{VERSION}}",       SOFTWARE_VERSION);
+    replace_all(tpl, "{{ACTIVE}}",        std::to_string(snap.active));
+    replace_all(tpl, "{{DAILY_UP}}",      human_bytes(snap.daily_up));
+    replace_all(tpl, "{{DAILY_DOWN}}",    human_bytes(snap.daily_down));
+    replace_all(tpl, "{{TOTAL_UP}}",      human_bytes(snap.total_up));
+    replace_all(tpl, "{{TOTAL_DOWN}}",    human_bytes(snap.total_down));
+    replace_all(tpl, "{{TRAFFIC_LINE}}",  traffic_line);
+    replace_all(tpl, "{{INFORMATION}}",   information);
     return tpl;
 }
 

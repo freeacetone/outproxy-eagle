@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{TITLE}}</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -26,7 +27,9 @@
     </div>
   </section>
 
-  <p class="since">Traffic since your last visit: <strong>{{SINCE_LAST_VISIT}}</strong></p>
+  <!-- Shows "since your last visit" when that delta is > 0, otherwise the
+       all-time total. The whole sentence is rendered server-side. -->
+  <p class="since">{{TRAFFIC_LINE}}</p>
 
   <!-- Optional box: drop a web/information.html file to fill it (donation
        info, config examples, contacts, ...). Full HTML, edited by hand. -->
