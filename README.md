@@ -67,6 +67,11 @@ The binary is `build/outproxy-eagle`.
 Copy `eagle.conf.example` to `eagle.conf` to customize. See that file for the
 full directive reference.
 
+### Running as a service
+
+A hardened systemd unit is provided in `systemd/outproxy-eagle.service`; its
+header comment lists the install steps (binary, config, `web/` directory).
+
 ## Web customization
 
 The `web/` directory (configurable via `set webdir`) is served as-is:

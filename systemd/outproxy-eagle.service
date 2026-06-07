@@ -1,0 +1,58 @@
+# outproxy-eagle systemd unit.
+#
+# Install:
+#   sudo install -Dm755 build/outproxy-eagle /usr/local/bin/outproxy-eagle
+#   sudo install -d /etc/outproxy-eagle /var/lib/outproxy-eagle
+#   sudo cp eagle.conf.example /etc/outproxy-eagle/eagle.conf   # then edit
+#   sudo cp -r web /var/lib/outproxy-eagle/                     # web templates
+#   sudo cp systemd/outproxy-eagle.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now outproxy-eagle
+#
+# Manage:
+#   systemctl status|stop|start|restart outproxy-eagle
+#   journalctl -u outproxy-eagle -f
+#
+# The working directory holds web/, eagle.log and stats.json. Set "webdir",
+# "logfile" and "statsfile" in the config as relative paths or absolute.
+
+[Unit]
+Description=outproxy-eagle - native HTTP/SOCKS5 outproxy with web statistics
+Documentation=https://github.com/freeacetone/outproxy-eagle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/outproxy-eagle -c /etc/outproxy-eagle/eagle.conf
+WorkingDirectory=/var/lib/outproxy-eagle
+Restart=on-failure
+RestartSec=2
+
+# Run as an unprivileged dynamic user; listeners use ports >1024 so no extra
+# capabilities are required.
+DynamicUser=yes
+StateDirectory=outproxy-eagle
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# Persisted data (stats.json / eagle.log) lives under /var/lib/outproxy-eagle.
+ReadWritePaths=/var/lib/outproxy-eagle
+
+[Install]
+WantedBy=multi-user.target
