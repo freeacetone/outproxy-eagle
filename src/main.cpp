@@ -1,233 +1,130 @@
 /*
-3proxy-eagle: Accumulate ethical 3proxy statistics with web interface.
-Source code: https://notabug.org/acetone/3proxy-eagle.
-Copyright (C) 2022, acetone
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+outproxy-eagle: lightweight native HTTP/SOCKS5 proxy with web statistics.
+Source: https://github.com/freeacetone/outproxy-eagle
+Copyright (C) 2022-2026, acetone. GPLv3.
 */
 
-#include "proxyinstanse.h"
-#include "httpserver.h"
-#include "statistics.h"
-#include "dbmanager.h"
-#include "g.h"
+#include "common.hpp"
+#include "config.hpp"
+#include "proxy.hpp"
+#include "router.hpp"
+#include "stats.hpp"
+#include "web.hpp"
 
-#include <QCoreApplication>
-#include <QProcess>
-#include <QDebug>
-#include <QThread>
+#include <asio/co_spawn.hpp>
+#include <asio/detached.hpp>
+#include <asio/signal_set.hpp>
+
+#include <algorithm>
+#include <chrono>
 #include <iostream>
-#include <signal.h>
+#include <thread>
+#include <vector>
 
-void terminate(int)
-{
-    std::cout << "Terminating..." << std::endl;
-    for (const auto& instanse: g::instanses)
-    {
-        instanse.second->deleteLater();
-        instanse.first->terminate();
-    }
-    std::exit(0);
-}
+using namespace eagle;
+
+namespace {
 
 void usage()
 {
-    std::cout << g::c::SOFTWARE_NAME.toStdString() << " " << g::c::SOFTWARE_VERSION.toStdString() << std::endl
-              << "Accumulate ethical 3proxy statistics with web interface\n\n"
-
-                 "U S A G E:\n"
-                 "  -i  --instanse                  <3proxy>,<3proxy.cfg>\n"
-                 "  -w  --working-directory         <data>\n"
-                 "  -t  --service-title             <3proxy-eagle>\n"
-                 "  -I  --ignored-destinations      <[0.0.0.0],0.0.0.0>\n"
-                 "  -a  --bind-to-address           <127.0.0.1>\n"
-                 "  -p  --bind-to-port              <8161>\n"
-                 "  -l  --log-level                 <info> (off, error, warn, info, debug)\n"
-                 "  -s  --top-lists-size            <10>\n"
-                 "  -D  --reject-ip-from-statistics\n\n"
-
-                 "N O T E S:\n"
-                 "* Multi instanses supported. Just pass new one --instanse value!\n"
-                 "* Main 3proxy cfg must contain log to stdout with strict format:\n"
-                 "    log\n"
-                 "    logformat \" type=%N destination=%n to=%O from=%I\"\n"
-                 "  Also for normal logging by 3proxy main config should contain\n"
-                 "    fakeresolve\n"
-                 "  otherwise 3proxy may be very uninformative.\n"
-                 "  Check \"outproxy_config\" folder as working example.\n"
-                 "* 3proxy cfg can contain blocked domains in format:\n"
-                 "    {{vk.com,mail.ru,google.com}}\n"
-                 "  This domains will be resolved automatically and replaced by:\n"
-                 "    deny * * original.domain\n"
-                 "    deny * * 8.8.8.8 # resolved addresses\n"
-                 "    deny * * 1.1.1.1\n"
-                 "* If the working directory contains a information.html, the Information\n"
-                 "  box will be added to the web page. The block is full html-formatted.\n"
-                 "* The html folder can contain any files, they will be available\n"
-                 "  for downloading through the web browser.\n"
-                 "* html folder can contain styles.css file for overloading default styles.\n"
-                 "  See page source via web browser to customize CSS classes.\n"
-
-                 "\n" << g::c::COPYRIGHT.toStdString() << std::endl;
+    std::cout
+        << SOFTWARE_NAME << " " << SOFTWARE_VERSION << "\n"
+        << "Lightweight native HTTP/SOCKS5 outproxy with a JS-free web UI.\n\n"
+        << "USAGE:\n"
+        << "  outproxy-eagle [-c <config>]\n\n"
+        << "OPTIONS:\n"
+        << "  -c, --config <path>   config file (default: eagle.conf)\n"
+        << "  -h, --help            show this help\n\n"
+        << "Without a config file the built-in defaults are used:\n"
+        << "  socks 0.0.0.0:1080, http 0.0.0.0:3128, web 127.0.0.1:8161\n"
+        << "  *.onion -> tor (socks5 127.0.0.1:9050)\n"
+        << "  *.i2p   -> i2pd (http  127.0.0.1:4444)\n"
+        << "  *       -> direct (system DNS, no parent proxy)\n\n"
+        << "Source: https://github.com/freeacetone/outproxy-eagle\n";
 }
 
-int main(int argc, char *argv[])
+tcp::endpoint make_endpoint(const Listener& l)
 {
-    signal(SIGINT, terminate);
-    signal(SIGTERM, terminate);
+    return tcp::endpoint(asio::ip::make_address(l.host), l.port);
+}
 
-    qInstallMessageHandler(g::customMessageOutput);
-
-    QCoreApplication a(argc, argv);
-
-    QList<QPair<QString,QString>> instanses;
-
-    for (int i = 1; i < argc; i++)
+awaitable<void> dump_loop(Stats& stats, std::string path, int seconds)
+{
+    asio::steady_timer timer(co_await asio::this_coro::executor);
+    for (;;)
     {
-        QString key(argv[i]);
-        QString value;
-        if (i+1 < argc)
-        {
-            value = argv[i+1];
-        }
+        timer.expires_after(std::chrono::seconds(seconds));
+        auto [ec] = co_await timer.async_wait(asio::as_tuple(use_awaitable));
+        if (ec) break;
+        stats.dump(path);
+    }
+}
 
-        if (key == "--log-level" and not value.isEmpty())
-        {
-            if (value.contains("off", Qt::CaseInsensitive))
-            {
-                g::logLevel = g::LogLevel::Off;
-            }
-            else if (value.contains("error", Qt::CaseInsensitive))
-            {
-                g::logLevel = g::LogLevel::Error;
-            }
-            else if (value.contains("warn", Qt::CaseInsensitive))
-            {
-                g::logLevel = g::LogLevel::Warning;
-            }
-            else if (value.contains("info", Qt::CaseInsensitive))
-            {
-                g::logLevel = g::LogLevel::Info;
-            }
-            else if (value.contains("debug", Qt::CaseInsensitive))
-            {
-                g::logLevel = g::LogLevel::Debug;
-            }
-            else
-            {
-                qWarning() << "Invalid log level flag:" << value << "(maybe you should read the --help)";
-            }
-        }
+} // namespace
 
-        else if ((key == "-i" or key == "--instanse") and not value.isEmpty())
-        {
-            QStringList splitted = value.split(',');
-            if (splitted.size() != 2)
-            {
-                qWarning() << "--instanse parsing failed:" << value;
-                continue;
-            }
-            instanses.push_back( {splitted.front(), splitted.back()} );
-        }
-
-        else if ((key == "-w" or key == "--working-directory") and not value.isEmpty())
-        {
-            g::p::WORKING_DIR = value;
-        }
-
-        else if ((key == "-I" or key == "--ignored-destinations") and not value.isEmpty())
-        {
-            g::p::IGNORED_DESTINATIONS = value.split(',');
-            for (auto& string: g::p::IGNORED_DESTINATIONS)
-            {
-                string.remove(' ');
-            }
-        }
-
-        else if ((key == "-b" or key == "--bind-to-address") and not value.isEmpty())
-        {
-            g::p::BIND_TO_ADDRESS = value;
-        }
-
-        else if ((key == "-p" or key == "--bind-to-port") and not value.isEmpty())
-        {
-            bool ok = false;
-            value.toUShort(&ok);
-            if (not ok)
-            {
-                qWarning() << "--bind-to-port parsing failed, incorrect port value:" << value;
-                continue;
-            }
-            g::p::BIND_TO_PORT = value.toUShort();
-        }
-
-        else if ((key == "-t" or key == "--service-title") and not value.isEmpty())
-        {
-            g::p::SERVICE_TITLE = value;
-        }
-
-        else if ((key == "-s" or key == "--top-lists-size") and not value.isEmpty())
-        {
-            bool ok = false;
-            value.toUInt(&ok);
-            if (not ok)
-            {
-                qWarning() << "--top-lists-size parsing failed, incorrect unsigned integer" << value;
-                continue;
-            }
-            g::p::LAST_AND_TOP_LIST_SIZE = value.toUInt();
-        }
-
-        else if (key == "-D" or key == "--reject-ip-from-statistics")
-        {
-            g::p::IGNORE_IP_ADDRS_IN_STATISTCS = true;
-        }
-
-        else if (key == "-h" or key == "--help")
+int main(int argc, char** argv)
+{
+    std::string cfg_path = "eagle.conf";
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string a = argv[i];
+        if ((a == "-c" || a == "--config") && i + 1 < argc)
+            cfg_path = argv[++i];
+        else if (a == "-h" || a == "--help")
         {
             usage();
             return 0;
         }
     }
 
-    if (instanses.isEmpty())
-    {
-        qFatal("Instanses not defined. Read --help information");
-    }
+    Config cfg = Config::load(cfg_path);
+    Stats  stats(cfg);
+    stats.load(cfg.stats_file);
+    Router router(cfg);
 
-    DBManager().initAtStart();
-    Statistics::initTrafficCounters();
+    asio::io_context ioc;
 
-    for (const auto& pair: instanses)
-    {
-        QThread* thread = new QThread;
-        ProxyInstanse* pi = new ProxyInstanse;
-        pi->set3proxyBinaryFile(pair.first);
-        pi->set3proxyConfigFile(pair.second);
-        pi->moveToThread(thread);
-        QObject::connect(thread, &QThread::started, pi, &ProxyInstanse::start);
-        thread->start();
-        g::instanses.push_back( {thread, pi} );
-    }
+    auto spawn_listener = [&](const Listener& l, const char* name, auto fn) {
+        if (!l.enabled()) return;
+        try
+        {
+            co_spawn(ioc, fn(make_endpoint(l), router, stats), asio::detached);
+            std::cout << name << " proxy listening on " << l.host << ":" << l.port << "\n";
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "failed to start " << name << " listener: " << e.what() << "\n";
+        }
+    };
 
-    qInfo().noquote() << "Instanses count:" << g::instanses.size();
-    qInfo().noquote() << "Working directory:" << g::p::WORKING_DIR;
-    qInfo().noquote() << "Ignored destinations:" << g::p::IGNORED_DESTINATIONS;
-    qInfo().noquote() << "Top lists size:" << g::p::LAST_AND_TOP_LIST_SIZE;
-    qInfo() << "Reject IP addresses from statistics:" << g::p::IGNORE_IP_ADDRS_IN_STATISTCS;
+    spawn_listener(cfg.socks, "SOCKS5", [](auto ep, Router& r, Stats& s) {
+        return socks5_listener(std::move(ep), r, s);
+    });
+    spawn_listener(cfg.http, "HTTP", [](auto ep, Router& r, Stats& s) {
+        return http_listener(std::move(ep), r, s);
+    });
 
-    (new HttpServer)/*->killTheCapitalism()*/;
+    co_spawn(ioc, dump_loop(stats, cfg.stats_file, cfg.dump_interval), asio::detached);
 
-    return a.exec();
+    web::start(cfg, stats);
+    std::cout << "web UI on http://" << cfg.web.host << ":" << cfg.web.port << "\n";
+
+    asio::signal_set signals(ioc, SIGINT, SIGTERM);
+    signals.async_wait([&](const asio::error_code&, int) {
+        std::cout << "\nshutting down...\n";
+        ioc.stop();
+    });
+
+    unsigned n = std::max(2u, std::thread::hardware_concurrency());
+    std::vector<std::thread> pool;
+    pool.reserve(n - 1);
+    for (unsigned i = 1; i < n; ++i)
+        pool.emplace_back([&ioc] { ioc.run(); });
+    ioc.run();
+    for (auto& t : pool) t.join();
+
+    web::stop();
+    stats.dump(cfg.stats_file);
+    std::cout << "terminated.\n";
+    return 0;
 }
