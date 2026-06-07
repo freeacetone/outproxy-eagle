@@ -10,7 +10,10 @@
 </head>
 <body>
 <main>
-  <h1>{{TITLE}}</h1>
+  <header>
+    <h1>{{TITLE}}</h1>
+    <div class="active"><span class="num">{{ACTIVE}}</span> active connections</div>
+  </header>
 
   <section class="traffic">
     <div class="card"><h3>Today &uarr;</h3><p>{{DAILY_UP}}</p></div>
@@ -18,6 +21,8 @@
     <div class="card"><h3>Total &uarr;</h3><p>{{TOTAL_UP}}</p></div>
     <div class="card"><h3>Total &darr;</h3><p>{{TOTAL_DOWN}}</p></div>
   </section>
+
+  <p class="since">Traffic since your last visit: <strong>{{SINCE_LAST_VISIT}}</strong></p>
 
   <!-- Optional box: drop a web/information.html file to fill it (donation
        info, config examples, contacts, ...). Full HTML, edited by hand. -->

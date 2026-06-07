@@ -21,10 +21,16 @@ awaitable<void> pump(tcp::socket& from, tcp::socket& to, uint64_t& counter)
     {
         auto [rec, n] = co_await from.async_read_some(asio::buffer(buf),
                                                       asio::as_tuple(use_awaitable));
-        if (rec || n == 0) break;
+        if (rec || n == 0)
+        {
+            break;
+        }
         auto [wec, w] = co_await asio::async_write(to, asio::buffer(buf, n),
                                                    asio::as_tuple(use_awaitable));
-        if (wec) break;
+        if (wec)
+        {
+            break;
+        }
         counter += n;
     }
     asio::error_code ec;

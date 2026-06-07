@@ -32,7 +32,9 @@ void split_host_port(const std::string& authority, std::string& host, uint16_t& 
         auto close = authority.find(']');
         host = authority.substr(1, close - 1);
         if (close + 1 < authority.size() && authority[close + 1] == ':')
+        {
             port = static_cast<uint16_t>(std::stoul(authority.substr(close + 2)));
+        }
         return;
     }
     auto colon = authority.rfind(':');
@@ -42,8 +44,13 @@ void split_host_port(const std::string& authority, std::string& host, uint16_t& 
         return;
     }
     host = authority.substr(0, colon);
-    try { port = static_cast<uint16_t>(std::stoul(authority.substr(colon + 1))); }
-    catch (...) {}
+    try
+    {
+        port = static_cast<uint16_t>(std::stoul(authority.substr(colon + 1)));
+    }
+    catch (...)
+    {
+    }
 }
 
 awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
@@ -86,7 +93,10 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
             // absolute-form: http://host[:port]/path
             std::string rest = target;
             auto scheme = rest.find("://");
-            if (scheme != std::string::npos) rest = rest.substr(scheme + 3);
+            if (scheme != std::string::npos)
+            {
+                rest = rest.substr(scheme + 3);
+            }
             auto slash = rest.find('/');
             std::string authority = (slash == std::string::npos) ? rest : rest.substr(0, slash);
             path = (slash == std::string::npos) ? "/" : rest.substr(slash);
@@ -160,7 +170,10 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
             }
         }
 
-        co_await relay(std::move(client), std::move(upstream), up, down);
+        {
+            ActiveConnectionGuard guard(stats);
+            co_await relay(std::move(client), std::move(upstream), up, down);
+        }
         stats.record(host, up, down, false, "http", client_ip);
     }
     catch (const std::exception&)
@@ -183,7 +196,10 @@ awaitable<void> http_listener(tcp::endpoint ep, Router& router, Stats& stats)
     for (;;)
     {
         auto [ec, sock] = co_await acceptor.async_accept(asio::as_tuple(use_awaitable));
-        if (ec) continue;
+        if (ec)
+        {
+            continue;
+        }
         co_spawn(ex, handle(std::move(sock), router, stats), asio::detached);
     }
 }

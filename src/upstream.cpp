@@ -17,7 +17,9 @@ namespace {
 awaitable<void> socks5_to_parent(tcp::socket& s, const std::string& host, uint16_t port)
 {
     if (host.size() > 255)
+    {
         throw std::runtime_error("hostname too long for SOCKS5");
+    }
 
     const uint8_t greet[3] = {0x05, 0x01, 0x00}; // VER, NMETHODS=1, NO-AUTH
     co_await asio::async_write(s, asio::buffer(greet, 3), use_awaitable);
@@ -25,7 +27,9 @@ awaitable<void> socks5_to_parent(tcp::socket& s, const std::string& host, uint16
     uint8_t sel[2];
     co_await asio::async_read(s, asio::buffer(sel, 2), use_awaitable);
     if (sel[0] != 0x05 || sel[1] != 0x00)
+    {
         throw std::runtime_error("SOCKS5 parent rejected auth method");
+    }
 
     std::vector<uint8_t> req;
     req.reserve(7 + host.size());
@@ -42,11 +46,19 @@ awaitable<void> socks5_to_parent(tcp::socket& s, const std::string& host, uint16
     uint8_t rep[4];
     co_await asio::async_read(s, asio::buffer(rep, 4), use_awaitable);
     if (rep[1] != 0x00)
+    {
         throw std::runtime_error("SOCKS5 parent CONNECT failed");
+    }
 
     std::size_t addrlen = 0;
-    if (rep[3] == 0x01) addrlen = 4;
-    else if (rep[3] == 0x04) addrlen = 16;
+    if (rep[3] == 0x01)
+    {
+        addrlen = 4;
+    }
+    else if (rep[3] == 0x04)
+    {
+        addrlen = 16;
+    }
     else if (rep[3] == 0x03)
     {
         uint8_t l = 0;
@@ -69,7 +81,9 @@ awaitable<void> http_connect_to_parent(tcp::socket& s, const std::string& host, 
     // Status line: "HTTP/1.1 200 ..."
     auto sp = resp.find(' ');
     if (sp == std::string::npos || sp + 1 >= resp.size() || resp[sp + 1] != '2')
+    {
         throw std::runtime_error("HTTP parent CONNECT failed: " + resp.substr(0, resp.find('\r')));
+    }
 }
 
 } // namespace
@@ -91,9 +105,13 @@ awaitable<tcp::socket> connect_upstream(const Parent& parent, std::string host, 
     co_await asio::async_connect(sock, eps, use_awaitable);
 
     if (parent.type == ParentType::Socks5)
+    {
         co_await socks5_to_parent(sock, host, port);
+    }
     else
+    {
         co_await http_connect_to_parent(sock, host, port);
+    }
 
     co_return sock;
 }

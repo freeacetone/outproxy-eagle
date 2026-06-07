@@ -42,7 +42,10 @@ top_of(const std::map<std::string, uint64_t>& m, std::size_t n)
     std::vector<std::pair<std::string, uint64_t>> v(m.begin(), m.end());
     std::sort(v.begin(), v.end(),
               [](const auto& a, const auto& b) { return a.second > b.second; });
-    if (v.size() > n) v.resize(n);
+    if (v.size() > n)
+    {
+        v.resize(n);
+    }
     return v;
 }
 
@@ -72,7 +75,10 @@ void Stats::roll_day_locked(const std::string& today)
 
 void Stats::rotate_log_locked()
 {
-    if (m_logMax == 0 || m_logWritten <= m_logMax) return;
+    if (m_logMax == 0 || m_logWritten <= m_logMax)
+    {
+        return;
+    }
     m_log.close();
     std::rename(m_logPath.c_str(), (m_logPath + ".1").c_str());
     m_log.open(m_logPath, std::ios::trunc);
@@ -85,7 +91,10 @@ void Stats::record(const std::string& dest, uint64_t up, uint64_t down,
     std::lock_guard<std::mutex> lk(m_mtx);
 
     const std::string today = today_str();
-    if (today != m_date) roll_day_locked(today);
+    if (today != m_date)
+    {
+        roll_day_locked(today);
+    }
 
     if (!blocked)
     {
@@ -97,9 +106,14 @@ void Stats::record(const std::string& dest, uint64_t up, uint64_t down,
         ++m_totalTop[dest];
 
         if (auto it = std::find(m_last.begin(), m_last.end(), dest); it != m_last.end())
+        {
             m_last.erase(it);
+        }
         m_last.push_front(dest);
-        while (m_last.size() > m_topN) m_last.pop_back();
+        while (m_last.size() > m_topN)
+        {
+            m_last.pop_back();
+        }
     }
 
     if (m_log.is_open())
@@ -123,6 +137,7 @@ Stats::Snapshot Stats::snapshot() const
     s.daily_down = m_dailyDown;
     s.total_up   = m_totalUp;
     s.total_down = m_totalDown;
+    s.active     = m_active.load();
     s.last.assign(m_last.begin(), m_last.end());
     s.top_daily  = top_of(m_dailyTop, m_topN);
     s.top_total  = top_of(m_totalTop, m_topN);
@@ -149,6 +164,7 @@ std::string Stats::json() const
     w["title"]          = m_title;
     w["version"]        = SOFTWARE_VERSION;
     w["date"]           = s.date;
+    w["active"]         = s.active;
     w["daily_upload"]   = s.daily_up;
     w["daily_download"] = s.daily_down;
     w["total_upload"]   = s.total_up;
@@ -162,31 +178,57 @@ std::string Stats::json() const
 void Stats::load(const std::string& path)
 {
     std::ifstream f(path);
-    if (!f) return;
+    if (!f)
+    {
+        return;
+    }
     std::stringstream ss;
     ss << f.rdbuf();
 
     auto r = crow::json::load(ss.str());
-    if (!r) return;
+    if (!r)
+    {
+        return;
+    }
 
     std::lock_guard<std::mutex> lk(m_mtx);
     try
     {
-        if (r.has("total_upload"))   m_totalUp   = r["total_upload"].u();
-        if (r.has("total_download")) m_totalDown = r["total_download"].u();
+        if (r.has("total_upload"))
+        {
+            m_totalUp = r["total_upload"].u();
+        }
+        if (r.has("total_download"))
+        {
+            m_totalDown = r["total_download"].u();
+        }
         if (r.has("total_top"))
+        {
             for (const auto& e : r["total_top"])
+            {
                 m_totalTop[std::string(e["dest"])] = e["count"].u();
+            }
+        }
 
         const std::string today = today_str();
         if (r.has("date") && std::string(r["date"]) == today)
         {
             m_date = today;
-            if (r.has("daily_upload"))   m_dailyUp   = r["daily_upload"].u();
-            if (r.has("daily_download")) m_dailyDown = r["daily_download"].u();
+            if (r.has("daily_upload"))
+            {
+                m_dailyUp = r["daily_upload"].u();
+            }
+            if (r.has("daily_download"))
+            {
+                m_dailyDown = r["daily_download"].u();
+            }
             if (r.has("daily_top"))
+            {
                 for (const auto& e : r["daily_top"])
+                {
                     m_dailyTop[std::string(e["dest"])] = e["count"].u();
+                }
+            }
         }
     }
     catch (...)
@@ -201,7 +243,10 @@ void Stats::dump(const std::string& path) const
     std::string tmp  = path + ".tmp";
     {
         std::ofstream o(tmp, std::ios::trunc);
-        if (!o) return;
+        if (!o)
+        {
+            return;
+        }
         o << data;
     }
     std::rename(tmp.c_str(), path.c_str());

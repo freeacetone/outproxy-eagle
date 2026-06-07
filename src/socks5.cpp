@@ -43,9 +43,15 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
         // Greeting: VER, NMETHODS, METHODS[]
         uint8_t hdr[2];
         co_await asio::async_read(client, asio::buffer(hdr, 2), use_awaitable);
-        if (hdr[0] != 0x05) co_return;
+        if (hdr[0] != 0x05)
+        {
+            co_return;
+        }
         std::vector<uint8_t> methods(hdr[1]);
-        if (hdr[1]) co_await asio::async_read(client, asio::buffer(methods), use_awaitable);
+        if (hdr[1])
+        {
+            co_await asio::async_read(client, asio::buffer(methods), use_awaitable);
+        }
 
         const uint8_t sel[2] = {0x05, 0x00}; // NO-AUTH (public proxy)
         co_await asio::async_write(client, asio::buffer(sel, 2), use_awaitable);
@@ -53,7 +59,10 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
         // Request: VER, CMD, RSV, ATYP, ADDR, PORT
         uint8_t req[4];
         co_await asio::async_read(client, asio::buffer(req, 4), use_awaitable);
-        if (req[0] != 0x05) co_return;
+        if (req[0] != 0x05)
+        {
+            co_return;
+        }
         const uint8_t cmd  = req[1];
         const uint8_t atyp = req[3];
 
@@ -123,7 +132,10 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
         co_await reply(client, REP_OK);
 
         uint64_t up = 0, down = 0;
-        co_await relay(std::move(client), std::move(upstream), up, down);
+        {
+            ActiveConnectionGuard guard(stats);
+            co_await relay(std::move(client), std::move(upstream), up, down);
+        }
         stats.record(host, up, down, false, "socks5", client_ip);
     }
     catch (const std::exception&)
@@ -146,7 +158,10 @@ awaitable<void> socks5_listener(tcp::endpoint ep, Router& router, Stats& stats)
     for (;;)
     {
         auto [ec, sock] = co_await acceptor.async_accept(asio::as_tuple(use_awaitable));
-        if (ec) continue;
+        if (ec)
+        {
+            continue;
+        }
         co_spawn(ex, handle(std::move(sock), router, stats), asio::detached);
     }
 }

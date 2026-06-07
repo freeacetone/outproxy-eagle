@@ -55,7 +55,10 @@ awaitable<void> dump_loop(Stats& stats, std::string path, int seconds)
     {
         timer.expires_after(std::chrono::seconds(seconds));
         auto [ec] = co_await timer.async_wait(asio::as_tuple(use_awaitable));
-        if (ec) break;
+        if (ec)
+        {
+            break;
+        }
         stats.dump(path);
     }
 }
@@ -69,7 +72,9 @@ int main(int argc, char** argv)
     {
         std::string a = argv[i];
         if ((a == "-c" || a == "--config") && i + 1 < argc)
+        {
             cfg_path = argv[++i];
+        }
         else if (a == "-h" || a == "--help")
         {
             usage();
@@ -85,7 +90,10 @@ int main(int argc, char** argv)
     asio::io_context ioc;
 
     auto spawn_listener = [&](const Listener& l, const char* name, auto fn) {
-        if (!l.enabled()) return;
+        if (!l.enabled())
+        {
+            return;
+        }
         try
         {
             co_spawn(ioc, fn(make_endpoint(l), router, stats), asio::detached);
@@ -119,9 +127,14 @@ int main(int argc, char** argv)
     std::vector<std::thread> pool;
     pool.reserve(n - 1);
     for (unsigned i = 1; i < n; ++i)
+    {
         pool.emplace_back([&ioc] { ioc.run(); });
+    }
     ioc.run();
-    for (auto& t : pool) t.join();
+    for (auto& t : pool)
+    {
+        t.join();
+    }
 
     web::stop();
     stats.dump(cfg.stats_file);

@@ -25,10 +25,15 @@ namespace {
 std::unique_ptr<crow::SimpleApp> g_app;
 std::future<void> g_server; // keep alive: run_async()'s future blocks on destruction
 
+constexpr const char* TRAFFIC_COOKIE = "trafficvolume";
+
 std::string read_file(const std::string& path)
 {
     std::ifstream f(path, std::ios::binary);
-    if (!f) return {};
+    if (!f)
+    {
+        return {};
+    }
     std::stringstream ss;
     ss << f.rdbuf();
     return ss.str();
@@ -52,12 +57,17 @@ std::string html_escape(const std::string& s)
     return out;
 }
 
+// Convert a byte count to a human-readable KiB/MiB/GiB string.
 std::string human_bytes(uint64_t b)
 {
     const char* units[] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB"};
     double v = static_cast<double>(b);
     int i = 0;
-    while (v >= 1024.0 && i < 5) { v /= 1024.0; ++i; }
+    while (v >= 1024.0 && i < 5)
+    {
+        v /= 1024.0;
+        ++i;
+    }
     char buf[32];
     std::snprintf(buf, sizeof buf, i == 0 ? "%.0f %s" : "%.2f %s", v, units[i]);
     return buf;
@@ -65,12 +75,37 @@ std::string human_bytes(uint64_t b)
 
 void replace_all(std::string& s, const std::string& from, const std::string& to)
 {
-    if (from.empty()) return;
+    if (from.empty())
+    {
+        return;
+    }
     std::size_t pos = 0;
     while ((pos = s.find(from, pos)) != std::string::npos)
     {
         s.replace(pos, from.size(), to);
         pos += to.size();
+    }
+}
+
+// Extract a named value from a Cookie request header ("a=1; trafficvolume=42").
+uint64_t cookie_value(const std::string& cookie_header, const std::string& name)
+{
+    std::string key = name + "=";
+    auto pos = cookie_header.find(key);
+    if (pos == std::string::npos)
+    {
+        return 0;
+    }
+    pos += key.size();
+    auto end = cookie_header.find(';', pos);
+    std::string val = cookie_header.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+    try
+    {
+        return std::stoull(val);
+    }
+    catch (...)
+    {
+        return 0;
     }
 }
 
@@ -88,60 +123,91 @@ R"HTML(<!DOCTYPE html>
 </head>
 <body>
 <main>
-<h1>{{TITLE}}</h1>
-<section class="traffic">
-  <div class="card"><h3>Today &uarr;</h3><p>{{DAILY_UP}}</p></div>
-  <div class="card"><h3>Today &darr;</h3><p>{{DAILY_DOWN}}</p></div>
-  <div class="card"><h3>Total &uarr;</h3><p>{{TOTAL_UP}}</p></div>
-  <div class="card"><h3>Total &darr;</h3><p>{{TOTAL_DOWN}}</p></div>
-</section>
-{{INFORMATION}}
-<section class="lists">
-  <div><h2>Last destinations</h2><ul class="last">{{LAST}}</ul></div>
-  <div><h2>Top today</h2><ul class="top">{{TOP_DAILY}}</ul></div>
-  <div><h2>Top total</h2><ul class="top">{{TOP_TOTAL}}</ul></div>
-</section>
-<footer>{{TITLE}} &middot; outproxy-eagle v{{VERSION}} &middot; {{DATE}}</footer>
+  <header>
+    <h1>{{TITLE}}</h1>
+    <div class="active"><span class="num">{{ACTIVE}}</span> active connections</div>
+  </header>
+
+  <section class="traffic">
+    <div class="card"><h3>Today &uarr;</h3><p>{{DAILY_UP}}</p></div>
+    <div class="card"><h3>Today &darr;</h3><p>{{DAILY_DOWN}}</p></div>
+    <div class="card"><h3>Total &uarr;</h3><p>{{TOTAL_UP}}</p></div>
+    <div class="card"><h3>Total &darr;</h3><p>{{TOTAL_DOWN}}</p></div>
+  </section>
+
+  <p class="since">Traffic since your last visit: <strong>{{SINCE_LAST_VISIT}}</strong></p>
+
+  {{INFORMATION}}
+
+  <section class="lists">
+    <div><h2>Last destinations</h2><ul class="last">{{LAST}}</ul></div>
+    <div><h2>Top today</h2><ul class="top">{{TOP_DAILY}}</ul></div>
+    <div><h2>Top total</h2><ul class="top">{{TOP_TOTAL}}</ul></div>
+  </section>
+
+  <footer>{{TITLE}} &middot; outproxy-eagle v{{VERSION}} &middot; {{DATE}} &middot;
+    <a href="/stats.json">stats.json</a></footer>
 </main>
 </body>
 </html>
 )HTML";
 }
 
-std::string render_index(const Config& cfg, Stats& stats)
+// Render the page. last_visit_volume comes from the client's cookie; the
+// current cumulative volume is written back to *current_volume for the cookie.
+std::string render_index(const Config& cfg, Stats& stats,
+                         uint64_t last_visit_volume, uint64_t* current_volume)
 {
     auto snap = stats.snapshot();
 
+    const uint64_t current = snap.total_up + snap.total_down;
+    if (current_volume)
+    {
+        *current_volume = current;
+    }
+    const uint64_t since = (current >= last_visit_volume) ? (current - last_visit_volume) : current;
+
     std::string tpl = read_file(cfg.web_dir + "/index.html");
-    if (tpl.empty()) tpl = default_template();
+    if (tpl.empty())
+    {
+        tpl = default_template();
+    }
 
     std::string last;
     for (const auto& d : snap.last)
+    {
         last += "<li>" + html_escape(d) + "</li>";
+    }
 
     auto render_top = [](const std::vector<std::pair<std::string, uint64_t>>& top) {
         std::string out;
         for (const auto& [d, c] : top)
+        {
             out += "<li><span class=\"dest\">" + html_escape(d) +
                    "</span><span class=\"count\">" + std::to_string(c) + "</span></li>";
+        }
         return out;
     };
 
     std::string information = read_file(cfg.web_dir + "/information.html");
     if (!information.empty())
+    {
         information = "<section class=\"information\">" + information + "</section>";
+    }
 
-    replace_all(tpl, "{{TITLE}}",      html_escape(cfg.title));
-    replace_all(tpl, "{{VERSION}}",    SOFTWARE_VERSION);
-    replace_all(tpl, "{{DATE}}",       html_escape(snap.date));
-    replace_all(tpl, "{{DAILY_UP}}",   human_bytes(snap.daily_up));
-    replace_all(tpl, "{{DAILY_DOWN}}", human_bytes(snap.daily_down));
-    replace_all(tpl, "{{TOTAL_UP}}",   human_bytes(snap.total_up));
-    replace_all(tpl, "{{TOTAL_DOWN}}", human_bytes(snap.total_down));
-    replace_all(tpl, "{{LAST}}",       last);
-    replace_all(tpl, "{{TOP_DAILY}}",  render_top(snap.top_daily));
-    replace_all(tpl, "{{TOP_TOTAL}}",  render_top(snap.top_total));
-    replace_all(tpl, "{{INFORMATION}}", information);
+    replace_all(tpl, "{{TITLE}}",            html_escape(cfg.title));
+    replace_all(tpl, "{{VERSION}}",          SOFTWARE_VERSION);
+    replace_all(tpl, "{{DATE}}",             html_escape(snap.date));
+    replace_all(tpl, "{{ACTIVE}}",           std::to_string(snap.active));
+    replace_all(tpl, "{{DAILY_UP}}",         human_bytes(snap.daily_up));
+    replace_all(tpl, "{{DAILY_DOWN}}",       human_bytes(snap.daily_down));
+    replace_all(tpl, "{{TOTAL_UP}}",         human_bytes(snap.total_up));
+    replace_all(tpl, "{{TOTAL_DOWN}}",       human_bytes(snap.total_down));
+    replace_all(tpl, "{{SINCE_LAST_VISIT}}", human_bytes(since));
+    replace_all(tpl, "{{LAST}}",             last);
+    replace_all(tpl, "{{TOP_DAILY}}",        render_top(snap.top_daily));
+    replace_all(tpl, "{{TOP_TOTAL}}",        render_top(snap.top_total));
+    replace_all(tpl, "{{INFORMATION}}",      information);
     return tpl;
 }
 
@@ -149,28 +215,60 @@ const char* content_type(const std::string& path)
 {
     auto dot = path.rfind('.');
     std::string ext = (dot == std::string::npos) ? "" : path.substr(dot + 1);
-    if (ext == "css")  return "text/css; charset=utf-8";
-    if (ext == "html") return "text/html; charset=utf-8";
-    if (ext == "txt")  return "text/plain; charset=utf-8";
-    if (ext == "png")  return "image/png";
-    if (ext == "jpg" || ext == "jpeg") return "image/jpeg";
-    if (ext == "gif")  return "image/gif";
-    if (ext == "svg")  return "image/svg+xml";
-    if (ext == "ico")  return "image/x-icon";
-    if (ext == "json") return "application/json";
+    if (ext == "css")
+    {
+        return "text/css; charset=utf-8";
+    }
+    if (ext == "html")
+    {
+        return "text/html; charset=utf-8";
+    }
+    if (ext == "txt")
+    {
+        return "text/plain; charset=utf-8";
+    }
+    if (ext == "png")
+    {
+        return "image/png";
+    }
+    if (ext == "jpg" || ext == "jpeg")
+    {
+        return "image/jpeg";
+    }
+    if (ext == "gif")
+    {
+        return "image/gif";
+    }
+    if (ext == "svg")
+    {
+        return "image/svg+xml";
+    }
+    if (ext == "ico")
+    {
+        return "image/x-icon";
+    }
+    if (ext == "json")
+    {
+        return "application/json";
+    }
     return "application/octet-stream";
 }
 
 crow::response serve_static(const Config& cfg, const std::string& rel)
 {
     if (rel.find("..") != std::string::npos)
+    {
         return crow::response(crow::status::NOT_FOUND);
+    }
 
     std::string data = read_file(cfg.web_dir + "/" + rel);
     if (data.empty())
     {
         std::ifstream probe(cfg.web_dir + "/" + rel, std::ios::binary);
-        if (!probe) return crow::response(crow::status::NOT_FOUND);
+        if (!probe)
+        {
+            return crow::response(crow::status::NOT_FOUND);
+        }
     }
     crow::response r(data);
     r.set_header("Content-Type", content_type(rel));
@@ -185,9 +283,13 @@ void web::start(const Config& cfg, Stats& stats)
     auto& app = *g_app;
     app.loglevel(crow::LogLevel::Warning);
 
-    auto index = [&cfg, &stats] {
-        crow::response r(render_index(cfg, stats));
+    auto index = [&cfg, &stats](const crow::request& req) {
+        uint64_t last = cookie_value(req.get_header_value("Cookie"), TRAFFIC_COOKIE);
+        uint64_t current = 0;
+        crow::response r(render_index(cfg, stats, last, &current));
         r.set_header("Content-Type", "text/html; charset=utf-8");
+        r.set_header("Set-Cookie", std::string(TRAFFIC_COOKIE) + "=" + std::to_string(current) +
+                                       "; Max-Age=31536000; Path=/; SameSite=Lax");
         return r;
     };
     CROW_ROUTE(app, "/")(index);
@@ -212,7 +314,10 @@ void web::stop()
     if (g_app)
     {
         g_app->stop();
-        if (g_server.valid()) g_server.wait();
+        if (g_server.valid())
+        {
+            g_server.wait();
+        }
         g_app.reset();
     }
 }

@@ -21,29 +21,53 @@ bool parse_endpoint(const std::string& token, std::string& host, uint16_t& port)
     if (!token.empty() && token.front() == '[')           // [::1]:8161
     {
         auto close = token.find(']');
-        if (close == std::string::npos) return false;
+        if (close == std::string::npos)
+        {
+            return false;
+        }
         h = token.substr(1, close - 1);
-        if (close + 1 >= token.size() || token[close + 1] != ':') return false;
+        if (close + 1 >= token.size() || token[close + 1] != ':')
+        {
+            return false;
+        }
         p = token.substr(close + 2);
     }
     else
     {
         auto colon = token.rfind(':');                    // last colon: host:port
-        if (colon == std::string::npos) return false;
+        if (colon == std::string::npos)
+        {
+            return false;
+        }
         h = token.substr(0, colon);
         p = token.substr(colon + 1);
     }
-    if (h.empty() || p.empty()) return false;
-    try { port = static_cast<uint16_t>(std::stoul(p)); }
-    catch (...) { return false; }
+    if (h.empty() || p.empty())
+    {
+        return false;
+    }
+    try
+    {
+        port = static_cast<uint16_t>(std::stoul(p));
+    }
+    catch (...)
+    {
+        return false;
+    }
     host = h;
     return true;
 }
 
 ParentType parse_parent_type(const std::string& s)
 {
-    if (s == "socks5" || s == "socks") return ParentType::Socks5;
-    if (s == "http")                   return ParentType::Http;
+    if (s == "socks5" || s == "socks")
+    {
+        return ParentType::Socks5;
+    }
+    if (s == "http")
+    {
+        return ParentType::Http;
+    }
     return ParentType::Direct;
 }
 
@@ -52,7 +76,10 @@ std::vector<std::string> tokenize(const std::string& line)
     std::vector<std::string> out;
     std::istringstream ss(line);
     std::string tok;
-    while (ss >> tok) out.push_back(tok);
+    while (ss >> tok)
+    {
+        out.push_back(tok);
+    }
     return out;
 }
 
@@ -92,24 +119,38 @@ Config Config::load(const std::string& path)
     while (std::getline(f, line))
     {
         ++lineno;
-        if (auto hash = line.find('#'); hash != std::string::npos) line.erase(hash);
+        if (auto hash = line.find('#'); hash != std::string::npos)
+        {
+            line.erase(hash);
+        }
         auto t = tokenize(line);
-        if (t.empty()) continue;
+        if (t.empty())
+        {
+            continue;
+        }
         const std::string& kw = t[0];
 
         auto need = [&](size_t n) {
             if (t.size() < n)
+            {
                 std::cerr << "config: line " << lineno << ": '" << kw << "' needs more arguments\n";
+            }
             return t.size() >= n;
         };
 
         if (kw == "http" && need(2))
         {
-            if (parse_endpoint(t[1], c.http.host, c.http.port)) any_listener = true;
+            if (parse_endpoint(t[1], c.http.host, c.http.port))
+            {
+                any_listener = true;
+            }
         }
         else if (kw == "socks" && need(2))
         {
-            if (parse_endpoint(t[1], c.socks.host, c.socks.port)) any_listener = true;
+            if (parse_endpoint(t[1], c.socks.host, c.socks.port))
+            {
+                any_listener = true;
+            }
         }
         else if (kw == "web" && need(2))
         {
@@ -144,14 +185,38 @@ Config Config::load(const std::string& path)
         {
             const std::string& key = t[1];
             const std::string& val = t[2];
-            if      (key == "title")        c.title = val;
-            else if (key == "webdir")       c.web_dir = val;
-            else if (key == "logfile")      c.log_file = val;
-            else if (key == "statsfile")    c.stats_file = val;
-            else if (key == "topsize")      c.top_list_size = std::stoul(val);
-            else if (key == "logmax")       c.log_max_bytes = std::stoull(val);
-            else if (key == "dumpinterval") c.dump_interval = std::stoi(val);
-            else std::cerr << "config: line " << lineno << ": unknown set key '" << key << "'\n";
+            if (key == "title")
+            {
+                c.title = val;
+            }
+            else if (key == "webdir")
+            {
+                c.web_dir = val;
+            }
+            else if (key == "logfile")
+            {
+                c.log_file = val;
+            }
+            else if (key == "statsfile")
+            {
+                c.stats_file = val;
+            }
+            else if (key == "topsize")
+            {
+                c.top_list_size = std::stoul(val);
+            }
+            else if (key == "logmax")
+            {
+                c.log_max_bytes = std::stoull(val);
+            }
+            else if (key == "dumpinterval")
+            {
+                c.dump_interval = std::stoi(val);
+            }
+            else
+            {
+                std::cerr << "config: line " << lineno << ": unknown set key '" << key << "'\n";
+            }
         }
         else
         {

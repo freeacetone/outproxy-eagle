@@ -22,18 +22,30 @@ std::string lower(std::string s)
     return s;
 }
 
-// Parse "addr/prefix" into 16 bytes (v4 mapped left-aligned in 4, v6 in 16) + prefix.
+// Parse "addr/prefix" into 16 bytes (v4 left-aligned in 4, v6 in 16) + prefix.
 bool parse_cidr(const std::string& s, std::array<uint8_t, 16>& net, int& prefix, bool& v6)
 {
     auto slash = s.find('/');
-    if (slash == std::string::npos) return false;
+    if (slash == std::string::npos)
+    {
+        return false;
+    }
     std::string addr = s.substr(0, slash);
-    try { prefix = std::stoi(s.substr(slash + 1)); }
-    catch (...) { return false; }
+    try
+    {
+        prefix = std::stoi(s.substr(slash + 1));
+    }
+    catch (...)
+    {
+        return false;
+    }
 
     asio::error_code ec;
     auto a = asio::ip::make_address(addr, ec);
-    if (ec) return false;
+    if (ec)
+    {
+        return false;
+    }
 
     net.fill(0);
     if (a.is_v4())
@@ -41,14 +53,20 @@ bool parse_cidr(const std::string& s, std::array<uint8_t, 16>& net, int& prefix,
         v6 = false;
         auto b = a.to_v4().to_bytes();
         std::copy(b.begin(), b.end(), net.begin());
-        if (prefix < 0 || prefix > 32) return false;
+        if (prefix < 0 || prefix > 32)
+        {
+            return false;
+        }
     }
     else
     {
         v6 = true;
         auto b = a.to_v6().to_bytes();
         std::copy(b.begin(), b.end(), net.begin());
-        if (prefix < 0 || prefix > 128) return false;
+        if (prefix < 0 || prefix > 128)
+        {
+            return false;
+        }
     }
     return true;
 }
@@ -57,22 +75,44 @@ bool cidr_match(const std::array<uint8_t, 16>& net, int prefix, bool v6, const s
 {
     asio::error_code ec;
     auto a = asio::ip::make_address(host, ec);
-    if (ec) return false;                         // host is not an IP literal
-    if (a.is_v6() != v6) return false;
+    if (ec)
+    {
+        return false; // host is not an IP literal
+    }
+    if (a.is_v6() != v6)
+    {
+        return false;
+    }
 
     std::array<uint8_t, 16> hb{};
     hb.fill(0);
-    if (v6) { auto b = a.to_v6().to_bytes(); std::copy(b.begin(), b.end(), hb.begin()); }
-    else    { auto b = a.to_v4().to_bytes(); std::copy(b.begin(), b.end(), hb.begin()); }
+    if (v6)
+    {
+        auto b = a.to_v6().to_bytes();
+        std::copy(b.begin(), b.end(), hb.begin());
+    }
+    else
+    {
+        auto b = a.to_v4().to_bytes();
+        std::copy(b.begin(), b.end(), hb.begin());
+    }
 
     int full = prefix / 8;
     int rem  = prefix % 8;
     for (int i = 0; i < full; ++i)
-        if (hb[i] != net[i]) return false;
+    {
+        if (hb[i] != net[i])
+        {
+            return false;
+        }
+    }
     if (rem)
     {
         uint8_t mask = static_cast<uint8_t>(0xFF << (8 - rem));
-        if ((hb[full] & mask) != (net[full] & mask)) return false;
+        if ((hb[full] & mask) != (net[full] & mask))
+        {
+            return false;
+        }
     }
     return true;
 }
@@ -145,24 +185,34 @@ Router::Decision Router::decide(const std::string& rawHost) const
         switch (r.kind)
         {
         case Kind::Any:
+        {
             hit = true;
             break;
+        }
         case Kind::Exact:
+        {
             hit = (host == r.text);
             break;
+        }
         case Kind::Suffix:
+        {
             hit = (host == r.text) ||
                   (host.size() > r.text.size() + 1 &&
                    host.compare(host.size() - r.text.size() - 1, r.text.size() + 1,
                                 "." + r.text) == 0);
             break;
+        }
         case Kind::Cidr:
+        {
             hit = cidr_match(r.net, r.prefix, r.v6, rawHost);
             break;
         }
+        }
 
         if (hit)
+        {
             return Decision{r.deny, r.parent};
+        }
     }
     return Decision{true, {}}; // no match -> deny
 }
