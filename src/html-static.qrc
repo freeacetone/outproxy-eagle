@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file>html/index.html</file>
+        <file>html/main.css</file>
+        <file>html/favicon.ico</file>
+    </qresource>
+</RCC>
