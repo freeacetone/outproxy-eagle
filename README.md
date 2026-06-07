@@ -60,9 +60,10 @@ The binary is `build/outproxy-eagle`.
 
 ## Install (.deb)
 
-Prebuilt Debian packages for Debian 12 (bookworm) and 13 (trixie) are attached
-to each [release](https://github.com/freeacetone/outproxy-eagle/releases) — built
-automatically by the `build-deb` GitHub Action.
+A prebuilt Debian package for Debian 13 (trixie) is attached to each
+[release](https://github.com/freeacetone/outproxy-eagle/releases) — built
+automatically by the `build-deb` GitHub Action. (Debian 12 ships an Asio too old
+for this code; build from source there.)
 
 ```sh
 sudo apt install ./outproxy-eagle_2.0.0_trixie_amd64.deb
