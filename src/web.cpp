@@ -117,7 +117,6 @@ R"HTML(<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="30">
 <title>{{TITLE}}</title>
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -129,24 +128,23 @@ R"HTML(<!DOCTYPE html>
   </header>
 
   <section class="traffic">
-    <div class="card"><h3>Today &uarr;</h3><p>{{DAILY_UP}}</p></div>
-    <div class="card"><h3>Today &darr;</h3><p>{{DAILY_DOWN}}</p></div>
-    <div class="card"><h3>Total &uarr;</h3><p>{{TOTAL_UP}}</p></div>
-    <div class="card"><h3>Total &darr;</h3><p>{{TOTAL_DOWN}}</p></div>
+    <div class="card">
+      <h3>Today</h3>
+      <div class="row"><span>RX</span><b>{{DAILY_DOWN}}</b></div>
+      <div class="row"><span>TX</span><b>{{DAILY_UP}}</b></div>
+    </div>
+    <div class="card">
+      <h3>Total</h3>
+      <div class="row"><span>RX</span><b>{{TOTAL_DOWN}}</b></div>
+      <div class="row"><span>TX</span><b>{{TOTAL_UP}}</b></div>
+    </div>
   </section>
 
   <p class="since">Traffic since your last visit: <strong>{{SINCE_LAST_VISIT}}</strong></p>
 
   {{INFORMATION}}
 
-  <section class="lists">
-    <div><h2>Last destinations</h2><ul class="last">{{LAST}}</ul></div>
-    <div><h2>Top today</h2><ul class="top">{{TOP_DAILY}}</ul></div>
-    <div><h2>Top total</h2><ul class="top">{{TOP_TOTAL}}</ul></div>
-  </section>
-
-  <footer>{{TITLE}} &middot; outproxy-eagle v{{VERSION}} &middot; {{DATE}} &middot;
-    <a href="/stats.json">stats.json</a></footer>
+  <footer><a href="https://github.com/freeacetone/outproxy-eagle">outproxy-eagle</a> v{{VERSION}}</footer>
 </main>
 </body>
 </html>
@@ -173,22 +171,6 @@ std::string render_index(const Config& cfg, Stats& stats,
         tpl = default_template();
     }
 
-    std::string last;
-    for (const auto& d : snap.last)
-    {
-        last += "<li>" + html_escape(d) + "</li>";
-    }
-
-    auto render_top = [](const std::vector<std::pair<std::string, uint64_t>>& top) {
-        std::string out;
-        for (const auto& [d, c] : top)
-        {
-            out += "<li><span class=\"dest\">" + html_escape(d) +
-                   "</span><span class=\"count\">" + std::to_string(c) + "</span></li>";
-        }
-        return out;
-    };
-
     std::string information = read_file(cfg.web_dir + "/information.html");
     if (!information.empty())
     {
@@ -197,16 +179,12 @@ std::string render_index(const Config& cfg, Stats& stats,
 
     replace_all(tpl, "{{TITLE}}",            html_escape(cfg.title));
     replace_all(tpl, "{{VERSION}}",          SOFTWARE_VERSION);
-    replace_all(tpl, "{{DATE}}",             html_escape(snap.date));
     replace_all(tpl, "{{ACTIVE}}",           std::to_string(snap.active));
     replace_all(tpl, "{{DAILY_UP}}",         human_bytes(snap.daily_up));
     replace_all(tpl, "{{DAILY_DOWN}}",       human_bytes(snap.daily_down));
     replace_all(tpl, "{{TOTAL_UP}}",         human_bytes(snap.total_up));
     replace_all(tpl, "{{TOTAL_DOWN}}",       human_bytes(snap.total_down));
     replace_all(tpl, "{{SINCE_LAST_VISIT}}", human_bytes(since));
-    replace_all(tpl, "{{LAST}}",             last);
-    replace_all(tpl, "{{TOP_DAILY}}",        render_top(snap.top_daily));
-    replace_all(tpl, "{{TOP_TOTAL}}",        render_top(snap.top_total));
     replace_all(tpl, "{{INFORMATION}}",      information);
     return tpl;
 }
@@ -294,12 +272,6 @@ void web::start(const Config& cfg, Stats& stats)
     };
     CROW_ROUTE(app, "/")(index);
     CROW_ROUTE(app, "/index.html")(index);
-
-    CROW_ROUTE(app, "/stats.json")([&stats] {
-        crow::response r(stats.json());
-        r.set_header("Content-Type", "application/json");
-        return r;
-    });
 
     CROW_ROUTE(app, "/<path>")([&cfg](const std::string& p) {
         return serve_static(cfg, p);

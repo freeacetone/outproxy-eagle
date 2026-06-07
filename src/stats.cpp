@@ -5,10 +5,8 @@ Copyright (C) 2022-2026, acetone. GPLv3.
 
 #include "stats.hpp"
 
-#include "crow_all.h"
-
-#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <sstream>
 
@@ -36,25 +34,51 @@ std::string now_str()
     return b;
 }
 
-std::vector<std::pair<std::string, uint64_t>>
-top_of(const std::map<std::string, uint64_t>& m, std::size_t n)
+// Minimal extractors for our own flat persistence JSON (no external parser).
+uint64_t json_num(const std::string& s, const std::string& key)
 {
-    std::vector<std::pair<std::string, uint64_t>> v(m.begin(), m.end());
-    std::sort(v.begin(), v.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
-    if (v.size() > n)
+    auto p = s.find("\"" + key + "\"");
+    if (p == std::string::npos)
     {
-        v.resize(n);
+        return 0;
     }
-    return v;
+    p = s.find(':', p);
+    if (p == std::string::npos)
+    {
+        return 0;
+    }
+    return std::strtoull(s.c_str() + p + 1, nullptr, 10);
+}
+
+std::string json_str(const std::string& s, const std::string& key)
+{
+    auto p = s.find("\"" + key + "\"");
+    if (p == std::string::npos)
+    {
+        return {};
+    }
+    p = s.find(':', p);
+    if (p == std::string::npos)
+    {
+        return {};
+    }
+    auto q1 = s.find('"', p);
+    if (q1 == std::string::npos)
+    {
+        return {};
+    }
+    auto q2 = s.find('"', q1 + 1);
+    if (q2 == std::string::npos)
+    {
+        return {};
+    }
+    return s.substr(q1 + 1, q2 - q1 - 1);
 }
 
 } // namespace
 
 Stats::Stats(const Config& cfg)
-    : m_title(cfg.title),
-      m_topN(cfg.top_list_size),
-      m_date(today_str()),
+    : m_date(today_str()),
       m_logPath(cfg.log_file),
       m_logMax(cfg.log_max_bytes)
 {
@@ -70,7 +94,6 @@ void Stats::roll_day_locked(const std::string& today)
 {
     m_date = today;
     m_dailyUp = m_dailyDown = 0;
-    m_dailyTop.clear();
 }
 
 void Stats::rotate_log_locked()
@@ -102,18 +125,6 @@ void Stats::record(const std::string& dest, uint64_t up, uint64_t down,
         m_dailyDown += down;
         m_totalUp   += up;
         m_totalDown += down;
-        ++m_dailyTop[dest];
-        ++m_totalTop[dest];
-
-        if (auto it = std::find(m_last.begin(), m_last.end(), dest); it != m_last.end())
-        {
-            m_last.erase(it);
-        }
-        m_last.push_front(dest);
-        while (m_last.size() > m_topN)
-        {
-            m_last.pop_back();
-        }
     }
 
     if (m_log.is_open())
@@ -138,41 +149,7 @@ Stats::Snapshot Stats::snapshot() const
     s.total_up   = m_totalUp;
     s.total_down = m_totalDown;
     s.active     = m_active.load();
-    s.last.assign(m_last.begin(), m_last.end());
-    s.top_daily  = top_of(m_dailyTop, m_topN);
-    s.top_total  = top_of(m_totalTop, m_topN);
     return s;
-}
-
-std::string Stats::json() const
-{
-    Snapshot s = snapshot();
-
-    auto top_array = [](const std::vector<std::pair<std::string, uint64_t>>& top) {
-        std::vector<crow::json::wvalue> arr;
-        for (const auto& [dest, count] : top)
-        {
-            crow::json::wvalue e;
-            e["dest"]  = dest;
-            e["count"] = count;
-            arr.push_back(std::move(e));
-        }
-        return arr;
-    };
-
-    crow::json::wvalue w;
-    w["title"]          = m_title;
-    w["version"]        = SOFTWARE_VERSION;
-    w["date"]           = s.date;
-    w["active"]         = s.active;
-    w["daily_upload"]   = s.daily_up;
-    w["daily_download"] = s.daily_down;
-    w["total_upload"]   = s.total_up;
-    w["total_download"] = s.total_down;
-    w["last"]           = s.last;
-    w["daily_top"]      = top_array(s.top_daily);
-    w["total_top"]      = top_array(s.top_total);
-    return w.dump();
 }
 
 void Stats::load(const std::string& path)
@@ -184,63 +161,31 @@ void Stats::load(const std::string& path)
     }
     std::stringstream ss;
     ss << f.rdbuf();
-
-    auto r = crow::json::load(ss.str());
-    if (!r)
-    {
-        return;
-    }
+    const std::string data = ss.str();
 
     std::lock_guard<std::mutex> lk(m_mtx);
-    try
-    {
-        if (r.has("total_upload"))
-        {
-            m_totalUp = r["total_upload"].u();
-        }
-        if (r.has("total_download"))
-        {
-            m_totalDown = r["total_download"].u();
-        }
-        if (r.has("total_top"))
-        {
-            for (const auto& e : r["total_top"])
-            {
-                m_totalTop[std::string(e["dest"])] = e["count"].u();
-            }
-        }
+    m_totalUp   = json_num(data, "total_upload");
+    m_totalDown = json_num(data, "total_download");
 
-        const std::string today = today_str();
-        if (r.has("date") && std::string(r["date"]) == today)
-        {
-            m_date = today;
-            if (r.has("daily_upload"))
-            {
-                m_dailyUp = r["daily_upload"].u();
-            }
-            if (r.has("daily_download"))
-            {
-                m_dailyDown = r["daily_download"].u();
-            }
-            if (r.has("daily_top"))
-            {
-                for (const auto& e : r["daily_top"])
-                {
-                    m_dailyTop[std::string(e["dest"])] = e["count"].u();
-                }
-            }
-        }
-    }
-    catch (...)
+    if (json_str(data, "date") == today_str())
     {
-        // tolerate malformed/partial persistence files
+        m_date      = today_str();
+        m_dailyUp   = json_num(data, "daily_upload");
+        m_dailyDown = json_num(data, "daily_download");
     }
 }
 
 void Stats::dump(const std::string& path) const
 {
-    std::string data = json();
-    std::string tmp  = path + ".tmp";
+    Snapshot s = snapshot();
+
+    std::string data = "{\"date\":\"" + s.date + "\"" +
+                       ",\"total_upload\":"   + std::to_string(s.total_up) +
+                       ",\"total_download\":" + std::to_string(s.total_down) +
+                       ",\"daily_upload\":"   + std::to_string(s.daily_up) +
+                       ",\"daily_download\":" + std::to_string(s.daily_down) + "}\n";
+
+    std::string tmp = path + ".tmp";
     {
         std::ofstream o(tmp, std::ios::trunc);
         if (!o)

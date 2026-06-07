@@ -3,8 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- JS-FREE: live values refresh via this meta tag, no scripting at all -->
-<meta http-equiv="refresh" content="30">
 <title>{{TITLE}}</title>
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -16,10 +14,16 @@
   </header>
 
   <section class="traffic">
-    <div class="card"><h3>Today &uarr;</h3><p>{{DAILY_UP}}</p></div>
-    <div class="card"><h3>Today &darr;</h3><p>{{DAILY_DOWN}}</p></div>
-    <div class="card"><h3>Total &uarr;</h3><p>{{TOTAL_UP}}</p></div>
-    <div class="card"><h3>Total &darr;</h3><p>{{TOTAL_DOWN}}</p></div>
+    <div class="card">
+      <h3>Today</h3>
+      <div class="row"><span>RX</span><b>{{DAILY_DOWN}}</b></div>
+      <div class="row"><span>TX</span><b>{{DAILY_UP}}</b></div>
+    </div>
+    <div class="card">
+      <h3>Total</h3>
+      <div class="row"><span>RX</span><b>{{TOTAL_DOWN}}</b></div>
+      <div class="row"><span>TX</span><b>{{TOTAL_UP}}</b></div>
+    </div>
   </section>
 
   <p class="since">Traffic since your last visit: <strong>{{SINCE_LAST_VISIT}}</strong></p>
@@ -28,25 +32,7 @@
        info, config examples, contacts, ...). Full HTML, edited by hand. -->
   {{INFORMATION}}
 
-  <section class="lists">
-    <div>
-      <h2>Last destinations</h2>
-      <ul class="last">{{LAST}}</ul>
-    </div>
-    <div>
-      <h2>Top today</h2>
-      <ul class="top">{{TOP_DAILY}}</ul>
-    </div>
-    <div>
-      <h2>Top total</h2>
-      <ul class="top">{{TOP_TOTAL}}</ul>
-    </div>
-  </section>
-
-  <footer>
-    {{TITLE}} &middot; outproxy-eagle v{{VERSION}} &middot; {{DATE}} &middot;
-    <a href="/stats.json">stats.json</a>
-  </footer>
+  <footer><a href="https://github.com/freeacetone/outproxy-eagle">outproxy-eagle</a> v{{VERSION}}</footer>
 </main>
 </body>
 </html>

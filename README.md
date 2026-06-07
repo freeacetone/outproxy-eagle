@@ -21,10 +21,11 @@ The result is a single self-contained binary that links only
 - Hostnames are passed to SOCKS5/HTTP parents verbatim (never resolved
   locally — "fakeresolve")
 - **Public by design**: no authentication
-- **JS-free web UI**: traffic counters, last/top destinations, an editable
-  Information box (donation info, config examples, ...), and `/stats.json`
-- Simple logging: plain-text access log with size rotation + periodic JSON
-  stats dump that survives restarts
+- **JS-free web UI**: today/total RX-TX traffic, active connection count, a
+  "since your last visit" figure (cookie), and an editable Information box
+  (donation info, config examples, ...)
+- Simple logging: plain-text access log with size rotation + periodic counter
+  persistence (`state.json`) that survives restarts
 
 ## Default configuration
 
@@ -76,8 +77,10 @@ header comment lists the install steps (binary, config, `web/` directory).
 
 The `web/` directory (configurable via `set webdir`) is served as-is:
 
-- `web/index.html` — the page template. Placeholders like `{{TITLE}}`,
-  `{{DAILY_UP}}`, `{{TOP_TOTAL}}`, `{{INFORMATION}}` are substituted on render.
+- `web/index.html` — the page template. Placeholders `{{TITLE}}`, `{{ACTIVE}}`,
+  `{{DAILY_UP}}`, `{{DAILY_DOWN}}`, `{{TOTAL_UP}}`, `{{TOTAL_DOWN}}`,
+  `{{SINCE_LAST_VISIT}}`, `{{VERSION}}` and `{{INFORMATION}}` are substituted
+  on render.
 - `web/style.css` — theme; edit or replace freely.
 - `web/information.html` — optional; its full HTML is injected as an
   Information box. Delete it to hide the box.

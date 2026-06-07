@@ -8,8 +8,8 @@
 /eagle.conf
 /eagle.log
 /eagle.log.*
-/stats.json
-/stats.json.tmp
+/state.json
+/state.json.tmp
 
 # editor
 .cache/

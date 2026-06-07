@@ -31,7 +31,6 @@ route  *         direct
 set title        outproxy-eagle
 set webdir       web
 set logfile      eagle.log
-set statsfile    stats.json
-set topsize      10
+set statsfile    state.json          # internal counter persistence
 set logmax       10485760
 set dumpinterval 30

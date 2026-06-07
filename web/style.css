@@ -17,16 +17,15 @@ body {
   font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-main { max-width: 920px; margin: 0 auto; padding: 32px 18px 56px; }
+main { max-width: 640px; margin: 0 auto; padding: 40px 20px 56px; }
 
 header {
   display: flex; align-items: baseline; justify-content: space-between;
-  flex-wrap: wrap; gap: 8px 16px; margin-bottom: 24px;
+  flex-wrap: wrap; gap: 8px 16px; margin-bottom: 28px;
 }
 h1 { font-size: 1.5rem; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
-h2 { font-size: 0.95rem; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
 h3 {
-  font-size: 0.72rem; color: var(--muted); margin: 0 0 6px; font-weight: 600;
+  font-size: 0.72rem; color: var(--muted); margin: 0 0 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.06em;
 }
 
@@ -36,22 +35,28 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.traffic { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.traffic { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .card {
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px;
+  border-radius: var(--radius); padding: 18px 20px;
 }
-.card p {
-  margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--accent);
+.card .row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 6px 0;
+}
+.card .row + .row { border-top: 1px solid var(--border); }
+.card .row span { color: var(--muted); font-size: 0.85rem; letter-spacing: 0.04em; }
+.card .row b {
+  font-size: 1.2rem; font-weight: 700; color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
-.since { color: var(--muted); font-size: 0.92rem; margin: 18px 2px 24px; }
+.since { color: var(--muted); font-size: 0.92rem; margin: 22px 2px 0; }
 .since strong { color: var(--text); font-variant-numeric: tabular-nums; }
 
 .information {
   background: var(--panel-2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px 20px; margin-bottom: 28px;
+  border-radius: var(--radius); padding: 16px 20px; margin-top: 28px;
 }
 .information a { color: var(--accent); }
 .information code {
@@ -59,19 +64,10 @@ h3 {
   padding: 1px 6px; font-size: 0.88em; word-break: break-all;
 }
 
-.lists { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.lists ul { list-style: none; margin: 0; padding: 0; }
-.lists li {
-  display: flex; justify-content: space-between; gap: 10px;
-  padding: 7px 11px; border-radius: 8px; background: var(--panel);
-  border: 1px solid var(--border); margin-bottom: 6px; word-break: break-all;
-}
-.lists .count { color: var(--accent); font-variant-numeric: tabular-nums; }
-
 footer { margin-top: 36px; color: var(--muted); font-size: 0.85rem; }
-footer a { color: var(--accent); }
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
 
-@media (max-width: 720px) {
-  .traffic { grid-template-columns: repeat(2, 1fr); }
-  .lists { grid-template-columns: 1fr; }
+@media (max-width: 520px) {
+  .traffic { grid-template-columns: 1fr; }
 }

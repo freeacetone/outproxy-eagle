@@ -201,10 +201,6 @@ Config Config::load(const std::string& path)
             {
                 c.stats_file = val;
             }
-            else if (key == "topsize")
-            {
-                c.top_list_size = std::stoul(val);
-            }
             else if (key == "logmax")
             {
                 c.log_max_bytes = std::stoull(val);

@@ -50,8 +50,7 @@ struct Config
     std::string title         = "outproxy-eagle";
     std::string web_dir       = "web";
     std::string log_file      = "eagle.log";
-    std::string stats_file    = "stats.json";
-    std::size_t top_list_size = 10;
+    std::string stats_file    = "state.json"; // internal counter persistence
     uint64_t    log_max_bytes = 10ull * 1024 * 1024;
     int         dump_interval = 30; // seconds
 
