@@ -97,6 +97,19 @@ awaitable<tcp::socket> connect_upstream(const Parent& parent, std::string host, 
     if (parent.type == ParentType::Direct)
     {
         auto eps = co_await resolver.async_resolve(host, std::to_string(port), use_awaitable);
+        // SSRF guard: a direct connection must never reach the server's own
+        // loopback (127.0.0.0/8 or ::1) -- not even via a hostname that
+        // resolves there (DNS rebinding) or an IP literal. Refuse if any
+        // resolved endpoint is loopback. Parent connections are intentionally
+        // exempt: their host:port is the operator-configured parent (e.g. Tor
+        // on 127.0.0.1:9050).
+        for (const auto& e : eps)
+        {
+            if (e.endpoint().address().is_loopback())
+            {
+                throw std::runtime_error("refused: target resolves to loopback (" + host + ")");
+            }
+        }
         co_await asio::async_connect(sock, eps, use_awaitable);
         co_return sock;
     }
