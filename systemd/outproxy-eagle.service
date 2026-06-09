@@ -27,6 +27,11 @@ WorkingDirectory=/var/lib/outproxy-eagle
 Restart=on-failure
 RestartSec=2
 
+# Each proxied connection uses two file descriptors (client + upstream). Raise
+# the limit far above the default 1024 so the proxy can hold many thousands of
+# concurrent tunnels; memory, not fd count, becomes the practical ceiling.
+LimitNOFILE=1048576
+
 # Run as an unprivileged dynamic user; listeners use ports >1024 so no extra
 # capabilities are required.
 DynamicUser=yes
