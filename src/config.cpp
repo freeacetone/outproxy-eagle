@@ -209,6 +209,10 @@ Config Config::load(const std::string& path)
             {
                 c.dump_interval = std::stoi(val);
             }
+            else if (key == "logging")
+            {
+                c.logging = (val == "on" || val == "yes" || val == "true" || val == "1");
+            }
             else
             {
                 std::cerr << "config: line " << lineno << ": unknown set key '" << key << "'\n";

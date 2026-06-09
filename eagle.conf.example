@@ -30,6 +30,9 @@ route  *         direct
 # ---- Misc ----
 set title        outproxy-eagle
 set webdir       web
+# Access logging is OFF by default (privacy). Set "on" to record per-connection
+# lines (timestamp, client IP, destination, bytes) to logfile.
+set logging      off
 set logfile      eagle.log
 set statsfile    state.json          # internal counter persistence
 set logmax       10485760

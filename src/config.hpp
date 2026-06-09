@@ -57,6 +57,7 @@ struct Config
     std::string stats_file    = "state.json"; // internal counter persistence
     uint64_t    log_max_bytes = 10ull * 1024 * 1024;
     int         dump_interval = 30; // seconds
+    bool        logging       = false; // access log off by default (privacy)
 
     // Built-in defaults: onion -> tor (socks5), i2p -> i2pd (http), rest -> direct.
     static Config defaults();

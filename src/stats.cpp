@@ -82,6 +82,12 @@ Stats::Stats(const Config& cfg)
       m_logPath(cfg.log_file),
       m_logMax(cfg.log_max_bytes)
 {
+    // Access logging is opt-in (privacy default). When disabled the log file is
+    // never opened, so record() keeps counters only and writes nothing to disk.
+    if (!cfg.logging)
+    {
+        return;
+    }
     m_log.open(m_logPath, std::ios::app);
     if (m_log)
     {
