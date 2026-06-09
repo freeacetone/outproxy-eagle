@@ -73,7 +73,11 @@ sudo systemctl enable --now outproxy-eagle
 
 The package installs the binary to `/usr/bin`, a config to
 `/etc/outproxy-eagle/eagle.conf` (a conffile), web assets to
-`/usr/share/outproxy-eagle/web`, and the systemd unit. To build a package
+`/usr/share/outproxy-eagle/web`, and the systemd unit. Both the config and
+the web assets are registered as dpkg conffiles, so an upgrade never clobbers
+edits you made to them — modified files are kept (a new packaged version, if
+any, lands beside them as `*.dpkg-dist`); untouched files are updated normally.
+To build a package
 yourself: `cmake -B build -DCMAKE_INSTALL_PREFIX=/usr && cmake --build build &&
 (cd build && cpack -G DEB)`.
 

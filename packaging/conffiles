@@ -1,1 +1,5 @@
 /etc/outproxy-eagle/eagle.conf
+/usr/share/outproxy-eagle/web/favicon.svg
+/usr/share/outproxy-eagle/web/index.html
+/usr/share/outproxy-eagle/web/information.html
+/usr/share/outproxy-eagle/web/style.css
