@@ -2,13 +2,22 @@
 set -e
 
 if [ "$1" = "configure" ]; then
-    # Register the unit (no auto-start: let the admin review the config first).
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl enable outproxy-eagle.service >/dev/null 2>&1 || true
+
+        if [ -z "$2" ]; then
+            # Fresh install ($2 empty): start with the shipped default config.
+            systemctl start outproxy-eagle.service >/dev/null 2>&1 || true
+            echo "outproxy-eagle installed and started."
+            echo "  edit /etc/outproxy-eagle/eagle.conf, then: systemctl restart outproxy-eagle"
+        else
+            # Upgrade ($2 = old version): pick up the new binary/unit only if the
+            # service was already running (don't resurrect one stopped on purpose).
+            systemctl try-restart outproxy-eagle.service >/dev/null 2>&1 || true
+            echo "outproxy-eagle upgraded."
+        fi
     fi
-    echo "outproxy-eagle installed."
-    echo "  1) edit /etc/outproxy-eagle/eagle.conf"
-    echo "  2) systemctl enable --now outproxy-eagle"
 fi
 
 exit 0

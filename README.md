@@ -66,10 +66,14 @@ automatically by the `build-deb` GitHub Action. (Debian 12 ships an Asio too old
 for this code; build from source there.)
 
 ```sh
-sudo apt install ./outproxy-eagle_2.0.0_trixie_amd64.deb
+sudo apt install ./outproxy-eagle_2.0.0_trixie_amd64.deb   # enables & starts the service
 sudoedit /etc/outproxy-eagle/eagle.conf
-sudo systemctl enable --now outproxy-eagle
+sudo systemctl restart outproxy-eagle                       # apply your config
 ```
+
+Installing enables and starts the service automatically (with the shipped
+default config); upgrading restarts it if it was running. Removal stops and
+disables it.
 
 The package installs the binary to `/usr/bin`, a config to
 `/etc/outproxy-eagle/eagle.conf` (a conffile), web assets to

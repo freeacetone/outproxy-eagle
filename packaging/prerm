@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+# Stop and disable the daemon on package removal, while the unit file still
+# exists (it is deleted after prerm). Not done on "upgrade"/"deconfigure":
+# postinst try-restarts the new version instead.
+if [ "$1" = "remove" ]; then
+    if [ -d /run/systemd/system ]; then
+        systemctl disable --now outproxy-eagle.service >/dev/null 2>&1 || true
+    fi
+fi
+
+exit 0

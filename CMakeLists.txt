@@ -81,5 +81,5 @@ set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/freeacetone/outproxy-eagle
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)              # auto Depends: libc6, libstdc++6
 set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/conffiles;${CMAKE_CURRENT_SOURCE_DIR}/packaging/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/postrm")
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/conffiles;${CMAKE_CURRENT_SOURCE_DIR}/packaging/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/prerm;${CMAKE_CURRENT_SOURCE_DIR}/packaging/postrm")
 include(CPack)
