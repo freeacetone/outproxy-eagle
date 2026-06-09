@@ -31,26 +31,22 @@ constexpr const char* TRAFFIC_COOKIE = "trafficvolume";
 
 // All web assets are read from disk ONCE at start() and served from memory
 // thereafter; no request ever touches the filesystem.
-struct CachedFile
-{
+struct CachedFile {
     std::string data;
     std::string content_type;
 };
 
-struct WebCache
-{
-    std::string index_tpl;           // index.html template (or built-in default)
-    std::string information_section; // pre-wrapped information box (or empty)
+struct WebCache {
+    std::string index_tpl;                             // index.html template (or built-in default)
+    std::string information_section;                   // pre-wrapped information box (or empty)
     std::unordered_map<std::string, CachedFile> files; // relative path -> file
 };
 
 std::unique_ptr<WebCache> g_cache;
 
-std::string read_file(const std::string& path)
-{
+std::string read_file(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
-    if (!f)
-    {
+    if (!f) {
         return {};
     }
     std::stringstream ss;
@@ -58,32 +54,37 @@ std::string read_file(const std::string& path)
     return ss.str();
 }
 
-std::string html_escape(const std::string& s)
-{
+std::string html_escape(const std::string& s) {
     std::string out;
     out.reserve(s.size());
-    for (char c : s)
-    {
-        switch (c)
-        {
-        case '&': out += "&amp;";  break;
-        case '<': out += "&lt;";   break;
-        case '>': out += "&gt;";   break;
-        case '"': out += "&quot;"; break;
-        default:  out += c;        break;
+    for (char c : s) {
+        switch (c) {
+        case '&':
+            out += "&amp;";
+            break;
+        case '<':
+            out += "&lt;";
+            break;
+        case '>':
+            out += "&gt;";
+            break;
+        case '"':
+            out += "&quot;";
+            break;
+        default:
+            out += c;
+            break;
         }
     }
     return out;
 }
 
 // Convert a byte count to a human-readable KiB/MiB/GiB string.
-std::string human_bytes(uint64_t b)
-{
+std::string human_bytes(uint64_t b) {
     const char* units[] = {"B", "KiB", "MiB", "GiB", "TiB", "PiB"};
     double v = static_cast<double>(b);
     int i = 0;
-    while (v >= 1024.0 && i < 5)
-    {
+    while (v >= 1024.0 && i < 5) {
         v /= 1024.0;
         ++i;
     }
@@ -92,46 +93,38 @@ std::string human_bytes(uint64_t b)
     return buf;
 }
 
-void replace_all(std::string& s, const std::string& from, const std::string& to)
-{
-    if (from.empty())
-    {
+void replace_all(std::string& s, const std::string& from, const std::string& to) {
+    if (from.empty()) {
         return;
     }
     std::size_t pos = 0;
-    while ((pos = s.find(from, pos)) != std::string::npos)
-    {
+    while ((pos = s.find(from, pos)) != std::string::npos) {
         s.replace(pos, from.size(), to);
         pos += to.size();
     }
 }
 
 // Extract a named value from a Cookie request header ("a=1; trafficvolume=42").
-uint64_t cookie_value(const std::string& cookie_header, const std::string& name)
-{
+uint64_t cookie_value(const std::string& cookie_header, const std::string& name) {
     std::string key = name + "=";
     auto pos = cookie_header.find(key);
-    if (pos == std::string::npos)
-    {
+    if (pos == std::string::npos) {
         return 0;
     }
     pos += key.size();
     auto end = cookie_header.find(';', pos);
-    std::string val = cookie_header.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
-    try
-    {
+    std::string val =
+        cookie_header.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+    try {
         return std::stoull(val);
-    }
-    catch (...)
-    {
+    } catch (...) {
         return 0;
     }
 }
 
-const char* default_template()
-{
+const char* default_template() {
     return
-R"HTML(<!DOCTYPE html>
+        R"HTML(<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -173,93 +166,76 @@ R"HTML(<!DOCTYPE html>
 
 // Render the page. last_visit_volume comes from the client's cookie; the
 // current cumulative volume is written back to *current_volume for the cookie.
-std::string render_index(const Config& cfg, Stats& stats,
-                         uint64_t last_visit_volume, uint64_t* current_volume)
-{
+std::string render_index(const Config& cfg, Stats& stats, uint64_t last_visit_volume,
+                         uint64_t* current_volume) {
     auto snap = stats.snapshot();
 
     const uint64_t current = snap.total_up + snap.total_down;
-    if (current_volume)
-    {
+    if (current_volume) {
         *current_volume = current;
     }
     const uint64_t since = (current >= last_visit_volume) ? (current - last_visit_volume) : current;
 
-    std::string tpl         = g_cache->index_tpl;
-    std::string information  = g_cache->information_section;
+    std::string tpl = g_cache->index_tpl;
+    std::string information = g_cache->information_section;
 
     // Show the delta since the visitor's last visit; fall back to the all-time
     // total when there is no new traffic to report (delta == 0).
     std::string traffic_line;
-    if (since > 0)
-    {
+    if (since > 0) {
         traffic_line = "Traffic since your last visit: <strong>" + human_bytes(since) + "</strong>";
-    }
-    else
-    {
+    } else {
         traffic_line = "Total traffic served: <strong>" + human_bytes(current) + "</strong>";
     }
 
-    replace_all(tpl, "{{TITLE}}",         html_escape(cfg.title));
-    replace_all(tpl, "{{VERSION}}",       SOFTWARE_VERSION);
-    replace_all(tpl, "{{ACTIVE}}",        std::to_string(snap.active));
-    replace_all(tpl, "{{DAILY_UP}}",      human_bytes(snap.daily_up));
-    replace_all(tpl, "{{DAILY_DOWN}}",    human_bytes(snap.daily_down));
-    replace_all(tpl, "{{TOTAL_UP}}",      human_bytes(snap.total_up));
-    replace_all(tpl, "{{TOTAL_DOWN}}",    human_bytes(snap.total_down));
-    replace_all(tpl, "{{TRAFFIC_LINE}}",  traffic_line);
-    replace_all(tpl, "{{INFORMATION}}",   information);
+    replace_all(tpl, "{{TITLE}}", html_escape(cfg.title));
+    replace_all(tpl, "{{VERSION}}", SOFTWARE_VERSION);
+    replace_all(tpl, "{{ACTIVE}}", std::to_string(snap.active));
+    replace_all(tpl, "{{DAILY_UP}}", human_bytes(snap.daily_up));
+    replace_all(tpl, "{{DAILY_DOWN}}", human_bytes(snap.daily_down));
+    replace_all(tpl, "{{TOTAL_UP}}", human_bytes(snap.total_up));
+    replace_all(tpl, "{{TOTAL_DOWN}}", human_bytes(snap.total_down));
+    replace_all(tpl, "{{TRAFFIC_LINE}}", traffic_line);
+    replace_all(tpl, "{{INFORMATION}}", information);
     return tpl;
 }
 
-const char* content_type(const std::string& path)
-{
+const char* content_type(const std::string& path) {
     auto dot = path.rfind('.');
     std::string ext = (dot == std::string::npos) ? "" : path.substr(dot + 1);
-    if (ext == "css")
-    {
+    if (ext == "css") {
         return "text/css; charset=utf-8";
     }
-    if (ext == "html")
-    {
+    if (ext == "html") {
         return "text/html; charset=utf-8";
     }
-    if (ext == "txt")
-    {
+    if (ext == "txt") {
         return "text/plain; charset=utf-8";
     }
-    if (ext == "png")
-    {
+    if (ext == "png") {
         return "image/png";
     }
-    if (ext == "jpg" || ext == "jpeg")
-    {
+    if (ext == "jpg" || ext == "jpeg") {
         return "image/jpeg";
     }
-    if (ext == "gif")
-    {
+    if (ext == "gif") {
         return "image/gif";
     }
-    if (ext == "svg")
-    {
+    if (ext == "svg") {
         return "image/svg+xml";
     }
-    if (ext == "ico")
-    {
+    if (ext == "ico") {
         return "image/x-icon";
     }
-    if (ext == "json")
-    {
+    if (ext == "json") {
         return "application/json";
     }
     return "application/octet-stream";
 }
 
-crow::response serve_static(const std::string& rel)
-{
+crow::response serve_static(const std::string& rel) {
     auto it = g_cache->files.find(rel);
-    if (it == g_cache->files.end())
-    {
+    if (it == g_cache->files.end()) {
         return crow::response(crow::status::NOT_FOUND);
     }
     crow::response r(it->second.data);
@@ -269,22 +245,18 @@ crow::response serve_static(const std::string& rel)
 
 // Read every regular file under web_dir into memory once. Called from start();
 // after this no request handler touches the filesystem.
-void build_cache(const Config& cfg)
-{
+void build_cache(const Config& cfg) {
     g_cache = std::make_unique<WebCache>();
 
     namespace fs = std::filesystem;
     std::error_code ec;
     fs::path root(cfg.web_dir);
-    for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
-    {
-        if (!it->is_regular_file(ec))
-        {
+    for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file(ec)) {
             continue;
         }
         std::string rel = fs::relative(it->path(), root, ec).generic_string();
-        if (ec || rel.empty())
-        {
+        if (ec || rel.empty()) {
             continue;
         }
         g_cache->files.emplace(rel, CachedFile{read_file(it->path().string()), content_type(rel)});
@@ -296,16 +268,15 @@ void build_cache(const Config& cfg)
                              : default_template();
 
     auto info = g_cache->files.find("information.html");
-    if (info != g_cache->files.end() && !info->second.data.empty())
-    {
-        g_cache->information_section = "<section class=\"information\">" + info->second.data + "</section>";
+    if (info != g_cache->files.end() && !info->second.data.empty()) {
+        g_cache->information_section =
+            "<section class=\"information\">" + info->second.data + "</section>";
     }
 }
 
 } // namespace
 
-void web::start(const Config& cfg, Stats& stats)
-{
+void web::start(const Config& cfg, Stats& stats) {
     build_cache(cfg);
 
     g_app = std::make_unique<crow::SimpleApp>();
@@ -324,21 +295,16 @@ void web::start(const Config& cfg, Stats& stats)
     CROW_ROUTE(app, "/")(index);
     CROW_ROUTE(app, "/index.html")(index);
 
-    CROW_ROUTE(app, "/<path>")([](const std::string& p) {
-        return serve_static(p);
-    });
+    CROW_ROUTE(app, "/<path>")([](const std::string& p) { return serve_static(p); });
 
     app.signal_clear(); // our own SIGINT/SIGTERM handling in main()
     g_server = app.bindaddr(cfg.web.host).port(cfg.web.port).concurrency(2).run_async();
 }
 
-void web::stop()
-{
-    if (g_app)
-    {
+void web::stop() {
+    if (g_app) {
         g_app->stop();
-        if (g_server.valid())
-        {
+        if (g_server.valid()) {
             g_server.wait();
         }
         g_app.reset();

@@ -20,28 +20,23 @@ using steady_clock = std::chrono::steady_clock;
 // pump observes EOF and the relay converges (clean half-close handling). On
 // every transfer it pushes the shared idle deadline forward (when enabled).
 awaitable<void> pump(tcp::socket& from, tcp::socket& to, uint64_t& counter,
-                     std::atomic<int64_t>* deadline, int idle_seconds)
-{
+                     std::atomic<int64_t>* deadline, int idle_seconds) {
     std::array<char, 32 * 1024> buf;
-    for (;;)
-    {
-        auto [rec, n] = co_await from.async_read_some(asio::buffer(buf),
-                                                      asio::as_tuple(use_awaitable));
-        if (rec || n == 0)
-        {
+    for (;;) {
+        auto [rec, n] =
+            co_await from.async_read_some(asio::buffer(buf), asio::as_tuple(use_awaitable));
+        if (rec || n == 0) {
             break;
         }
-        if (deadline)
-        {
+        if (deadline) {
             deadline->store((steady_clock::now() + std::chrono::seconds(idle_seconds))
                                 .time_since_epoch()
                                 .count(),
                             std::memory_order_relaxed);
         }
-        auto [wec, w] = co_await asio::async_write(to, asio::buffer(buf, n),
-                                                   asio::as_tuple(use_awaitable));
-        if (wec)
-        {
+        auto [wec, w] =
+            co_await asio::async_write(to, asio::buffer(buf, n), asio::as_tuple(use_awaitable));
+        if (wec) {
             break;
         }
         counter += n;
@@ -53,15 +48,12 @@ awaitable<void> pump(tcp::socket& from, tcp::socket& to, uint64_t& counter,
 // Idle watchdog: closes both sockets once the shared deadline elapses without
 // being pushed forward by a pump. It re-arms to the latest deadline each wakeup,
 // so activity never has to cancel a pending timer (no race with the pumps).
-awaitable<void> watchdog(tcp::socket& a, tcp::socket& b, std::atomic<int64_t>& deadline)
-{
+awaitable<void> watchdog(tcp::socket& a, tcp::socket& b, std::atomic<int64_t>& deadline) {
     asio::steady_timer timer(co_await asio::this_coro::executor);
-    for (;;)
-    {
+    for (;;) {
         steady_clock::time_point dl{
             steady_clock::duration{deadline.load(std::memory_order_relaxed)}};
-        if (steady_clock::now() >= dl)
-        {
+        if (steady_clock::now() >= dl) {
             asio::error_code ec;
             a.close(ec);
             b.close(ec);
@@ -74,21 +66,17 @@ awaitable<void> watchdog(tcp::socket& a, tcp::socket& b, std::atomic<int64_t>& d
 
 } // namespace
 
-awaitable<void> relay(tcp::socket client, tcp::socket upstream,
-                      uint64_t& up_bytes, uint64_t& down_bytes, int idle_seconds)
-{
+awaitable<void> relay(tcp::socket client, tcp::socket upstream, uint64_t& up_bytes,
+                      uint64_t& down_bytes, int idle_seconds) {
     using namespace asio::experimental::awaitable_operators;
 
-    if (idle_seconds > 0)
-    {
+    if (idle_seconds > 0) {
         std::atomic<int64_t> deadline{
             (steady_clock::now() + std::chrono::seconds(idle_seconds)).time_since_epoch().count()};
         co_await ((pump(client, upstream, up_bytes, &deadline, idle_seconds) &&
                    pump(upstream, client, down_bytes, &deadline, idle_seconds)) ||
                   watchdog(client, upstream, deadline));
-    }
-    else
-    {
+    } else {
         co_await (pump(client, upstream, up_bytes, nullptr, 0) &&
                   pump(upstream, client, down_bytes, nullptr, 0));
     }

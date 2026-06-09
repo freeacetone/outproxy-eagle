@@ -1,0 +1,26 @@
+---
+Language:        Cpp
+BasedOnStyle:    LLVM
+
+# Indentation
+IndentWidth:     4
+TabWidth:        4
+UseTab:          Never
+AccessModifierOffset: -4
+NamespaceIndentation: None
+IndentCaseLabels: false
+
+# Braces: opening brace stays on the same line (K&R / attached).
+BreakBeforeBraces: Attach
+
+# Layout
+ColumnLimit:     100
+PointerAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes
+SortIncludes:    false
+
+# Keep short blocks readable but never collapse control statements.
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty

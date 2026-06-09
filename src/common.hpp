@@ -14,6 +14,6 @@ Copyright (C) 2022-2026, acetone. GPLv3.
 
 #include "config.hpp" // SOFTWARE_NAME / SOFTWARE_VERSION
 
-using asio::ip::tcp;
 using asio::awaitable;
 using asio::use_awaitable;
+using asio::ip::tcp;

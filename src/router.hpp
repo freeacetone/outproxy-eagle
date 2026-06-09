@@ -14,13 +14,11 @@ Copyright (C) 2022-2026, acetone. GPLv3.
 
 namespace eagle {
 
-class Router
-{
+class Router {
 public:
-    struct Decision
-    {
-        bool   deny = false;
-        Parent parent;             // valid when !deny
+    struct Decision {
+        bool deny = false;
+        Parent parent; // valid when !deny
     };
 
     explicit Router(const Config& cfg);
@@ -32,15 +30,14 @@ public:
 private:
     enum class Kind { Any, Suffix, Exact, Cidr };
 
-    struct CompiledRule
-    {
-        Kind        kind = Kind::Exact;
-        std::string text;                  // suffix base / exact host (lowercased)
-        bool        v6 = false;            // for Cidr
-        std::array<uint8_t, 16> net{};     // for Cidr
-        int         prefix = 0;            // for Cidr
-        bool        deny = false;
-        Parent      parent;
+    struct CompiledRule {
+        Kind kind = Kind::Exact;
+        std::string text;              // suffix base / exact host (lowercased)
+        bool v6 = false;               // for Cidr
+        std::array<uint8_t, 16> net{}; // for Cidr
+        int prefix = 0;                // for Cidr
+        bool deny = false;
+        Parent parent;
     };
 
     std::vector<CompiledRule> m_rules;

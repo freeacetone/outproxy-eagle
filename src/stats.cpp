@@ -14,8 +14,7 @@ namespace eagle {
 
 namespace {
 
-std::string today_str()
-{
+std::string today_str() {
     std::time_t t = std::time(nullptr);
     std::tm lt{};
     localtime_r(&t, &lt);
@@ -24,8 +23,7 @@ std::string today_str()
     return b;
 }
 
-std::string now_str()
-{
+std::string now_str() {
     std::time_t t = std::time(nullptr);
     std::tm lt{};
     localtime_r(&t, &lt);
@@ -35,41 +33,33 @@ std::string now_str()
 }
 
 // Minimal extractors for our own flat persistence JSON (no external parser).
-uint64_t json_num(const std::string& s, const std::string& key)
-{
+uint64_t json_num(const std::string& s, const std::string& key) {
     auto p = s.find("\"" + key + "\"");
-    if (p == std::string::npos)
-    {
+    if (p == std::string::npos) {
         return 0;
     }
     p = s.find(':', p);
-    if (p == std::string::npos)
-    {
+    if (p == std::string::npos) {
         return 0;
     }
     return std::strtoull(s.c_str() + p + 1, nullptr, 10);
 }
 
-std::string json_str(const std::string& s, const std::string& key)
-{
+std::string json_str(const std::string& s, const std::string& key) {
     auto p = s.find("\"" + key + "\"");
-    if (p == std::string::npos)
-    {
+    if (p == std::string::npos) {
         return {};
     }
     p = s.find(':', p);
-    if (p == std::string::npos)
-    {
+    if (p == std::string::npos) {
         return {};
     }
     auto q1 = s.find('"', p);
-    if (q1 == std::string::npos)
-    {
+    if (q1 == std::string::npos) {
         return {};
     }
     auto q2 = s.find('"', q1 + 1);
-    if (q2 == std::string::npos)
-    {
+    if (q2 == std::string::npos) {
         return {};
     }
     return s.substr(q1 + 1, q2 - q1 - 1);
@@ -78,34 +68,26 @@ std::string json_str(const std::string& s, const std::string& key)
 } // namespace
 
 Stats::Stats(const Config& cfg)
-    : m_date(today_str()),
-      m_logPath(cfg.log_file),
-      m_logMax(cfg.log_max_bytes)
-{
+    : m_date(today_str()), m_logPath(cfg.log_file), m_logMax(cfg.log_max_bytes) {
     // Access logging is opt-in (privacy default). When disabled the log file is
     // never opened, so record() keeps counters only and writes nothing to disk.
-    if (!cfg.logging)
-    {
+    if (!cfg.logging) {
         return;
     }
     m_log.open(m_logPath, std::ios::app);
-    if (m_log)
-    {
+    if (m_log) {
         m_log.seekp(0, std::ios::end);
         m_logWritten = static_cast<uint64_t>(m_log.tellp());
     }
 }
 
-void Stats::roll_day_locked(const std::string& today)
-{
+void Stats::roll_day_locked(const std::string& today) {
     m_date = today;
     m_dailyUp = m_dailyDown = 0;
 }
 
-void Stats::rotate_log_locked()
-{
-    if (m_logMax == 0 || m_logWritten <= m_logMax)
-    {
+void Stats::rotate_log_locked() {
+    if (m_logMax == 0 || m_logWritten <= m_logMax) {
         return;
     }
     m_log.close();
@@ -114,30 +96,26 @@ void Stats::rotate_log_locked()
     m_logWritten = 0;
 }
 
-void Stats::record(const std::string& dest, uint64_t up, uint64_t down,
-                   bool blocked, const std::string& proto, const std::string& client_ip)
-{
+void Stats::record(const std::string& dest, uint64_t up, uint64_t down, bool blocked,
+                   const std::string& proto, const std::string& client_ip) {
     std::lock_guard<std::mutex> lk(m_mtx);
 
     const std::string today = today_str();
-    if (today != m_date)
-    {
+    if (today != m_date) {
         roll_day_locked(today);
     }
 
-    if (!blocked)
-    {
-        m_dailyUp   += up;
+    if (!blocked) {
+        m_dailyUp += up;
         m_dailyDown += down;
-        m_totalUp   += up;
+        m_totalUp += up;
         m_totalDown += down;
     }
 
-    if (m_log.is_open())
-    {
+    if (m_log.is_open()) {
         std::string line = now_str() + " " + proto + " " + client_ip + " " +
-                           (blocked ? "BLOCK " : "ALLOW ") + dest +
-                           " up=" + std::to_string(up) + " down=" + std::to_string(down) + "\n";
+                           (blocked ? "BLOCK " : "ALLOW ") + dest + " up=" + std::to_string(up) +
+                           " down=" + std::to_string(down) + "\n";
         m_log << line;
         m_log.flush();
         m_logWritten += line.size();
@@ -145,24 +123,21 @@ void Stats::record(const std::string& dest, uint64_t up, uint64_t down,
     }
 }
 
-Stats::Snapshot Stats::snapshot() const
-{
+Stats::Snapshot Stats::snapshot() const {
     std::lock_guard<std::mutex> lk(m_mtx);
     Snapshot s;
-    s.date       = m_date;
-    s.daily_up   = m_dailyUp;
+    s.date = m_date;
+    s.daily_up = m_dailyUp;
     s.daily_down = m_dailyDown;
-    s.total_up   = m_totalUp;
+    s.total_up = m_totalUp;
     s.total_down = m_totalDown;
-    s.active     = m_active.load();
+    s.active = m_active.load();
     return s;
 }
 
-void Stats::load(const std::string& path)
-{
+void Stats::load(const std::string& path) {
     std::ifstream f(path);
-    if (!f)
-    {
+    if (!f) {
         return;
     }
     std::stringstream ss;
@@ -170,32 +145,29 @@ void Stats::load(const std::string& path)
     const std::string data = ss.str();
 
     std::lock_guard<std::mutex> lk(m_mtx);
-    m_totalUp   = json_num(data, "total_upload");
+    m_totalUp = json_num(data, "total_upload");
     m_totalDown = json_num(data, "total_download");
 
-    if (json_str(data, "date") == today_str())
-    {
-        m_date      = today_str();
-        m_dailyUp   = json_num(data, "daily_upload");
+    if (json_str(data, "date") == today_str()) {
+        m_date = today_str();
+        m_dailyUp = json_num(data, "daily_upload");
         m_dailyDown = json_num(data, "daily_download");
     }
 }
 
-void Stats::dump(const std::string& path) const
-{
+void Stats::dump(const std::string& path) const {
     Snapshot s = snapshot();
 
     std::string data = "{\"date\":\"" + s.date + "\"" +
-                       ",\"total_upload\":"   + std::to_string(s.total_up) +
+                       ",\"total_upload\":" + std::to_string(s.total_up) +
                        ",\"total_download\":" + std::to_string(s.total_down) +
-                       ",\"daily_upload\":"   + std::to_string(s.daily_up) +
+                       ",\"daily_upload\":" + std::to_string(s.daily_up) +
                        ",\"daily_download\":" + std::to_string(s.daily_down) + "}\n";
 
     std::string tmp = path + ".tmp";
     {
         std::ofstream o(tmp, std::ios::trunc);
-        if (!o)
-        {
+        if (!o) {
             return;
         }
         o << data;
