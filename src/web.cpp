@@ -12,11 +12,13 @@ refresh via an HTML <meta http-equiv="refresh"> tag, not scripting.
 #include "crow_all.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <future>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 namespace eagle {
 
@@ -26,6 +28,23 @@ std::unique_ptr<crow::SimpleApp> g_app;
 std::future<void> g_server; // keep alive: run_async()'s future blocks on destruction
 
 constexpr const char* TRAFFIC_COOKIE = "trafficvolume";
+
+// All web assets are read from disk ONCE at start() and served from memory
+// thereafter; no request ever touches the filesystem.
+struct CachedFile
+{
+    std::string data;
+    std::string content_type;
+};
+
+struct WebCache
+{
+    std::string index_tpl;           // index.html template (or built-in default)
+    std::string information_section; // pre-wrapped information box (or empty)
+    std::unordered_map<std::string, CachedFile> files; // relative path -> file
+};
+
+std::unique_ptr<WebCache> g_cache;
 
 std::string read_file(const std::string& path)
 {
@@ -166,17 +185,8 @@ std::string render_index(const Config& cfg, Stats& stats,
     }
     const uint64_t since = (current >= last_visit_volume) ? (current - last_visit_volume) : current;
 
-    std::string tpl = read_file(cfg.web_dir + "/index.html");
-    if (tpl.empty())
-    {
-        tpl = default_template();
-    }
-
-    std::string information = read_file(cfg.web_dir + "/information.html");
-    if (!information.empty())
-    {
-        information = "<section class=\"information\">" + information + "</section>";
-    }
+    std::string tpl         = g_cache->index_tpl;
+    std::string information  = g_cache->information_section;
 
     // Show the delta since the visitor's last visit; fall back to the all-time
     // total when there is no new traffic to report (delta == 0).
@@ -245,31 +255,59 @@ const char* content_type(const std::string& path)
     return "application/octet-stream";
 }
 
-crow::response serve_static(const Config& cfg, const std::string& rel)
+crow::response serve_static(const std::string& rel)
 {
-    if (rel.find("..") != std::string::npos)
+    auto it = g_cache->files.find(rel);
+    if (it == g_cache->files.end())
     {
         return crow::response(crow::status::NOT_FOUND);
     }
-
-    std::string data = read_file(cfg.web_dir + "/" + rel);
-    if (data.empty())
-    {
-        std::ifstream probe(cfg.web_dir + "/" + rel, std::ios::binary);
-        if (!probe)
-        {
-            return crow::response(crow::status::NOT_FOUND);
-        }
-    }
-    crow::response r(data);
-    r.set_header("Content-Type", content_type(rel));
+    crow::response r(it->second.data);
+    r.set_header("Content-Type", it->second.content_type);
     return r;
+}
+
+// Read every regular file under web_dir into memory once. Called from start();
+// after this no request handler touches the filesystem.
+void build_cache(const Config& cfg)
+{
+    g_cache = std::make_unique<WebCache>();
+
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path root(cfg.web_dir);
+    for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+    {
+        if (!it->is_regular_file(ec))
+        {
+            continue;
+        }
+        std::string rel = fs::relative(it->path(), root, ec).generic_string();
+        if (ec || rel.empty())
+        {
+            continue;
+        }
+        g_cache->files.emplace(rel, CachedFile{read_file(it->path().string()), content_type(rel)});
+    }
+
+    auto idx = g_cache->files.find("index.html");
+    g_cache->index_tpl = (idx != g_cache->files.end() && !idx->second.data.empty())
+                             ? idx->second.data
+                             : default_template();
+
+    auto info = g_cache->files.find("information.html");
+    if (info != g_cache->files.end() && !info->second.data.empty())
+    {
+        g_cache->information_section = "<section class=\"information\">" + info->second.data + "</section>";
+    }
 }
 
 } // namespace
 
 void web::start(const Config& cfg, Stats& stats)
 {
+    build_cache(cfg);
+
     g_app = std::make_unique<crow::SimpleApp>();
     auto& app = *g_app;
     app.loglevel(crow::LogLevel::Warning);
@@ -286,8 +324,8 @@ void web::start(const Config& cfg, Stats& stats)
     CROW_ROUTE(app, "/")(index);
     CROW_ROUTE(app, "/index.html")(index);
 
-    CROW_ROUTE(app, "/<path>")([&cfg](const std::string& p) {
-        return serve_static(cfg, p);
+    CROW_ROUTE(app, "/<path>")([](const std::string& p) {
+        return serve_static(p);
     });
 
     app.signal_clear(); // our own SIGINT/SIGTERM handling in main()
