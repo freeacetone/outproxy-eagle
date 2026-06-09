@@ -25,10 +25,14 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            build-essential cmake libasio-dev dpkg-dev file git ca-certificates
+            build-essential cmake libasio-dev dpkg-dev file git ca-certificates \
+            clang-format
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: ./format.sh --check
 
       - name: Resolve version from tag
         id: ver
