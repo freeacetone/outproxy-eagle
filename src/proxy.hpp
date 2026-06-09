@@ -20,11 +20,12 @@ class Stats;
 awaitable<tcp::socket> connect_upstream(const Parent& parent, std::string host, uint16_t port);
 
 // Bidirectionally relay until either side closes. Counts bytes client->upstream
-// into up_bytes and upstream->client into down_bytes.
+// into up_bytes and upstream->client into down_bytes. If idle_seconds > 0 the
+// relay is dropped after that many seconds with no traffic in either direction.
 awaitable<void> relay(tcp::socket client, tcp::socket upstream,
-                      uint64_t& up_bytes, uint64_t& down_bytes);
+                      uint64_t& up_bytes, uint64_t& down_bytes, int idle_seconds);
 
-awaitable<void> socks5_listener(tcp::endpoint ep, Router& router, Stats& stats);
-awaitable<void> http_listener(tcp::endpoint ep, Router& router, Stats& stats);
+awaitable<void> socks5_listener(tcp::endpoint ep, Router& router, Stats& stats, int idle_seconds);
+awaitable<void> http_listener(tcp::endpoint ep, Router& router, Stats& stats, int idle_seconds);
 
 } // namespace eagle

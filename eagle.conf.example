@@ -37,3 +37,6 @@ set logfile      eagle.log
 set statsfile    state.json          # internal counter persistence
 set logmax       10485760
 set dumpinterval 30
+# Drop a tunnel after this many seconds with no traffic in either direction.
+# Generous default keeps long-lived idle connections (e.g. SSH) alive; 0 = off.
+set idletimeout  600

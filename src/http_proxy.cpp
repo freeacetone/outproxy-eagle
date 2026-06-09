@@ -53,7 +53,7 @@ void split_host_port(const std::string& authority, std::string& host, uint16_t& 
     }
 }
 
-awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
+awaitable<void> handle(tcp::socket client, Router& router, Stats& stats, int idle_seconds)
 {
     std::string client_ip;
     try
@@ -172,7 +172,7 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
 
         {
             ActiveConnectionGuard guard(stats);
-            co_await relay(std::move(client), std::move(upstream), up, down);
+            co_await relay(std::move(client), std::move(upstream), up, down, idle_seconds);
         }
         stats.record(host, up, down, false, "http", client_ip);
     }
@@ -184,7 +184,7 @@ awaitable<void> handle(tcp::socket client, Router& router, Stats& stats)
 
 } // namespace
 
-awaitable<void> http_listener(tcp::endpoint ep, Router& router, Stats& stats)
+awaitable<void> http_listener(tcp::endpoint ep, Router& router, Stats& stats, int idle_seconds)
 {
     auto ex = co_await asio::this_coro::executor;
     tcp::acceptor acceptor(ex);
@@ -200,7 +200,7 @@ awaitable<void> http_listener(tcp::endpoint ep, Router& router, Stats& stats)
         {
             continue;
         }
-        co_spawn(ex, handle(std::move(sock), router, stats), asio::detached);
+        co_spawn(ex, handle(std::move(sock), router, stats, idle_seconds), asio::detached);
     }
 }
 

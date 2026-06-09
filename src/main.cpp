@@ -105,11 +105,11 @@ int main(int argc, char** argv)
         }
     };
 
-    spawn_listener(cfg.socks, "SOCKS5", [](auto ep, Router& r, Stats& s) {
-        return socks5_listener(std::move(ep), r, s);
+    spawn_listener(cfg.socks, "SOCKS5", [idle = cfg.idle_timeout](auto ep, Router& r, Stats& s) {
+        return socks5_listener(std::move(ep), r, s, idle);
     });
-    spawn_listener(cfg.http, "HTTP", [](auto ep, Router& r, Stats& s) {
-        return http_listener(std::move(ep), r, s);
+    spawn_listener(cfg.http, "HTTP", [idle = cfg.idle_timeout](auto ep, Router& r, Stats& s) {
+        return http_listener(std::move(ep), r, s, idle);
     });
 
     co_spawn(ioc, dump_loop(stats, cfg.stats_file, cfg.dump_interval), asio::detached);

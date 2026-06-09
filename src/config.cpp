@@ -213,6 +213,10 @@ Config Config::load(const std::string& path)
             {
                 c.logging = (val == "on" || val == "yes" || val == "true" || val == "1");
             }
+            else if (key == "idletimeout")
+            {
+                c.idle_timeout = std::stoi(val);
+            }
             else
             {
                 std::cerr << "config: line " << lineno << ": unknown set key '" << key << "'\n";

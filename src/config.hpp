@@ -56,8 +56,9 @@ struct Config
     std::string log_file      = "eagle.log";
     std::string stats_file    = "state.json"; // internal counter persistence
     uint64_t    log_max_bytes = 10ull * 1024 * 1024;
-    int         dump_interval = 30; // seconds
+    int         dump_interval = 30;  // seconds
     bool        logging       = false; // access log off by default (privacy)
+    int         idle_timeout  = 600; // seconds with no traffic before a relay is dropped (0 = off)
 
     // Built-in defaults: onion -> tor (socks5), i2p -> i2pd (http), rest -> direct.
     static Config defaults();
